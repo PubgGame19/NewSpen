@@ -1,0 +1,27 @@
+{
+  "name": "spenance",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SPENANCE - Personal Finance & Loan Management System",
+  "scripts": {
+    "dev": "vite",
+    "dev:host": "vite --host --port 5179",
+    "build": "vite build",
+    "preview": "vite preview",
+    "host": "vite build && vite preview --host --port 3000"
+  },
+  "dependencies": {
+    "lucide-react": "^0.474.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.1",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.7"
+  }
+}
