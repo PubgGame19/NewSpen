@@ -9,6 +9,7 @@ import useClickOutside from '../../hooks/useClickOutside'
 import NotificationDropdown from '../NotificationDropdown'
 import ProfileDropdown from '../ProfileDropdown'
 import Button from '../ui/Button'
+import Logo from '../ui/Logo'
 
 export default function Header({ onOpenMobileNav }) {
   const { transactions, theme, toggleTheme, openQuickAdd } = useApp()
@@ -153,6 +154,8 @@ export default function Header({ onOpenMobileNav }) {
         >
           <Menu size={19} />
         </button>
+
+        <Logo className="h-8 w-8 lg:hidden" />
 
         <div className="min-w-0">
           <h1 className="heading truncate text-[15px] font-bold sm:text-base">

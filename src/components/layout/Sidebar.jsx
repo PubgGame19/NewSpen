@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronsUpDown, PanelLeftClose, Sparkles, X } from 'lucide
 import { NAV_ITEMS } from '../../config/nav'
 import { useApp } from '../../context/AppContext'
 import { formatINR } from '../../utils/format'
+import Logo from '../ui/Logo'
 
 function NavItem({ item, collapsed, onNavigate }) {
   const Icon = item.icon
@@ -57,9 +58,7 @@ function SidebarBody({ collapsed, onNavigate, onClose, mobile }) {
           collapsed ? 'justify-center px-3' : ''
         }`}
       >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-sm font-extrabold text-white shadow-sm">
-          S
-        </span>
+        <Logo className="h-10 w-10" />
         {!collapsed ? (
           <div className="min-w-0 flex-1">
             <p className="heading text-[15px] font-extrabold tracking-tight">
@@ -174,7 +173,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
           sidebarCollapsed ? 'w-[84px]' : 'w-[264px]'
         }`}
       >
-        <div className="sticky top-0 h-screen">
+        <div className="h-screen-safe sticky top-0">
           <SidebarBody collapsed={sidebarCollapsed} />
         </div>
       </aside>

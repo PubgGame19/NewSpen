@@ -232,3 +232,27 @@
     display: none;
   }
 }
+
+/*
+ * Full-viewport sizing that behaves at 100% zoom in every browser.
+ * `100dvh` keeps mobile browser toolbars from clipping the layout, and the
+ * `@supports not` block below gives engines without dynamic-viewport units
+ * (and any browser that ignores the dvh declaration) the classic `100vh`.
+ */
+@utility min-h-screen-safe {
+  min-height: 100dvh;
+}
+
+@utility h-screen-safe {
+  height: 100dvh;
+}
+
+@supports not (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100vh;
+  }
+
+  .h-screen-safe {
+    height: 100vh;
+  }
+}

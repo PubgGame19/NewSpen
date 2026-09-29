@@ -3,21 +3,101 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- brand -->
+    <title>SPENANCE — Smart Finance, Better Future</title>
     <meta
       name="description"
-      content="SPENANCE — Personal Finance & Loan Management System"
+      content="SPENANCE — Smart Finance, Better Future. Personal finance & loan management demo: expense tracking, budgets, loan EMIs, financial health score and savings insights on fictional September 2026 data."
+    />
+    <meta name="application-name" content="SPENANCE" />
+    <meta name="author" content="SPENANCE" />
+    <!-- browser UI colour, light + dark (the app theme re-syncs these at runtime) -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#047857"
+      data-theme-color="light"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#0b1220"
+      data-theme-color="dark"
+    />
+
+    <!-- icons: the tab bar shows the SPENANCE emblem itself — a 16/32/48 .ico per
+         scheme, plus 96px PNGs, so no browser picks the wrong artwork -->
+    <link
+      rel="icon"
+      href="/favicon.ico"
+      sizes="16x16 32x32 48x48"
+      media="(prefers-color-scheme: light)"
+      data-favicon="light-ico"
     />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23059669'/%3E%3Ctext x='50%25' y='57%25' font-family='Inter,Segoe UI,sans-serif' font-size='34' font-weight='800' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E"
+      href="/favicon-dark.ico"
+      sizes="16x16 32x32 48x48"
+      media="(prefers-color-scheme: dark)"
+      data-favicon="dark-ico"
     />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="96x96"
+      href="/favicon.png"
+      media="(prefers-color-scheme: light)"
+      data-favicon="light-png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="96x96"
+      href="/favicon-dark.png"
+      media="(prefers-color-scheme: dark)"
+      data-favicon="dark-png"
+    />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="SPENANCE" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- social / metadata cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SPENANCE" />
+    <meta property="og:title" content="SPENANCE — Smart Finance, Better Future" />
+    <meta
+      property="og:description"
+      content="Personal finance & loan management demo: expenses, budgets, loan EMIs, health score and savings insights."
+    />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="SPENANCE logo — Smart Finance | Better Future"
+    />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SPENANCE — Smart Finance, Better Future" />
+    <meta
+      name="twitter:description"
+      content="Personal finance & loan management demo: expenses, budgets, loan EMIs, health score and savings insights."
+    />
+    <meta name="twitter:image" content="/og-image.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="SPENANCE logo — Smart Finance | Better Future"
+    />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <title>SPENANCE — Personal Finance &amp; Loan Management System</title>
   </head>
   <body>
     <div id="root"></div>

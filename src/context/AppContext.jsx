@@ -21,6 +21,8 @@ import {
 } from '../data/mockData'
 import { financialScore, ratioPercent, scoreLabel } from '../utils/finance'
 import { formatShortDate } from '../utils/format'
+import { clearSession, readSession, writeSession } from '../utils/auth'
+import { syncBrowserChrome } from '../utils/brandIcons'
 
 const STORAGE_KEY = 'spenance.state.v1'
 
@@ -78,6 +80,10 @@ const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
   const [state, setState] = useState(loadState)
+  /* Prototype session — null means the login screen is required. */
+  const [session, setSession] = useState(readSession)
+  /* True right after an explicit sign-out, so /login can explain itself. */
+  const [justSignedOut, setJustSignedOut] = useState(false)
   const [toasts, setToasts] = useState([])
   /* "Add expense" modal is shared by the header and the pages */
   const [quickAddOpen, setQuickAddOpen] = useState(false)
@@ -94,8 +100,11 @@ export function AppProvider({ children }) {
   /* -------------------------------- theme ------------------------------- */
   useEffect(() => {
     const root = document.documentElement
-    root.classList.toggle('dark', state.theme === 'dark')
+    const dark = state.theme === 'dark'
+    root.classList.toggle('dark', dark)
     root.style.colorScheme = state.theme
+    /* tab icon + browser UI colour follow the app theme, not just the OS */
+    syncBrowserChrome(state.theme)
   }, [state.theme])
 
   /* ------------------------------- toasts ------------------------------- */
@@ -109,6 +118,19 @@ export function AppProvider({ children }) {
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  /* ------------------------------- session ------------------------------ */
+  const signIn = useCallback((nextSession, remember = true) => {
+    writeSession(nextSession, remember)
+    setSession(nextSession)
+    setJustSignedOut(false)
+  }, [])
+
+  const signOut = useCallback(() => {
+    clearSession()
+    setSession(null)
+    setJustSignedOut(true)
   }, [])
 
   /* ------------------------------ mutations ----------------------------- */
@@ -451,6 +473,10 @@ export function AppProvider({ children }) {
     () => ({
       ...state,
       ...metrics,
+      session,
+      signIn,
+      signOut,
+      justSignedOut,
       unreadCount,
       quickAddOpen,
       openQuickAdd,
@@ -478,6 +504,10 @@ export function AppProvider({ children }) {
     [
       state,
       metrics,
+      session,
+      signIn,
+      signOut,
+      justSignedOut,
       unreadCount,
       quickAddOpen,
       openQuickAdd,

@@ -15,10 +15,9 @@ import Modal from './ui/Modal'
 import Button from './ui/Button'
 
 export default function ProfileDropdown() {
-  const { profile, theme, toggleTheme, resetDemoData, pushToast } = useApp()
+  const { profile, theme, toggleTheme, resetDemoData, pushToast, signOut } = useApp()
   const [open, setOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
-  const [signOutOpen, setSignOutOpen] = useState(false)
   const ref = useRef(null)
   const navigate = useNavigate()
 
@@ -120,7 +119,8 @@ export default function ProfileDropdown() {
                 type="button"
                 onClick={() => {
                   setOpen(false)
-                  setSignOutOpen(true)
+                  signOut()
+                  navigate('/login', { replace: true, state: { signedOut: true } })
                 }}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-rose-600 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
               >
@@ -163,26 +163,6 @@ export default function ProfileDropdown() {
         <p className="muted text-[13px] leading-relaxed">
           Any expenses or budget changes you made during this session will be
           discarded. This is useful between demo runs.
-        </p>
-      </Modal>
-
-      <Modal
-        open={signOutOpen}
-        onClose={() => setSignOutOpen(false)}
-        title="Demo mode"
-        description="SPENANCE is a college project demo."
-        icon={LogOut}
-        size="sm"
-        footer={
-          <Button variant="ghost" onClick={() => setSignOutOpen(false)}>
-            Back to dashboard
-          </Button>
-        }
-      >
-        <p className="muted text-[13px] leading-relaxed">
-          There is no real authentication in this prototype. You are signed in as
-          the fictional demo user <strong className="heading">Rahul Sharma</strong>,
-          and all data lives only in your browser's localStorage.
         </p>
       </Modal>
     </>

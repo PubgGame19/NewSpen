@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local env / secrets (Vercel holds the real values)
+.env
+.env.*
+
+# Tool metadata
+.freebuff/

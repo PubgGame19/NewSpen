@@ -2,6 +2,9 @@
   "name": "spenance",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "description": "SPENANCE - Personal Finance & Loan Management System",
   "scripts": {
