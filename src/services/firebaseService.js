@@ -22,6 +22,7 @@ import {
   orderBy,
   writeBatch,
   serverTimestamp,
+  deleteField,
 } from 'firebase/firestore'
 import { auth, db, googleProvider, isFirebaseConfigured } from '../config/firebase'
 import {
@@ -402,9 +403,13 @@ export async function deleteLoanFirestore(uid, loanId) {
 export async function updateProfileFirestore(uid, patch) {
   if (!isFirebaseConfigured || !db || !uid) return
   const userRef = doc(db, 'users', uid)
-  const snap = await getDoc(userRef)
-  if (snap.exists()) {
-    const existing = snap.data().profile || {}
-    await updateDoc(userRef, { profile: { ...existing, ...patch } })
-  }
+  await setDoc(
+    userRef,
+    {
+      profile: patch,
+      'profile.monthlyIncome': deleteField(),
+      'profile.openingBalance': deleteField(),
+    },
+    { merge: true },
+  )
 }

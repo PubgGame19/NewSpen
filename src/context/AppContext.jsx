@@ -201,7 +201,26 @@ export function AppProvider({ children }) {
       onUserData: (data) => {
         if (!data) return
         setState((prev) => {
-          const profile = data.profile ? { ...prev.profile, ...data.profile } : prev.profile
+          const rawProfile = data.profile || {}
+          const firestoreIncome = rawProfile.monthlyIncome ?? data['profile.monthlyIncome']
+          const firestoreBalance = rawProfile.openingBalance ?? data['profile.openingBalance']
+
+          const resolvedMonthlyIncome =
+            firestoreIncome !== undefined && Number(firestoreIncome) > 0
+              ? Number(firestoreIncome)
+              : (Number(prev.profile.monthlyIncome) || 0)
+
+          const resolvedOpeningBalance =
+            firestoreBalance !== undefined
+              ? Number(firestoreBalance)
+              : (Number(prev.profile.openingBalance) || 0)
+
+          const profile = {
+            ...prev.profile,
+            ...rawProfile,
+            monthlyIncome: resolvedMonthlyIncome,
+            openingBalance: resolvedOpeningBalance,
+          }
           if (profile.monthlyIncome === 45000) profile.monthlyIncome = 0
           if (profile.emergencyFund === 68000) profile.emergencyFund = 0
           if (profile.debtToIncome === 24) profile.debtToIncome = 0
@@ -604,11 +623,15 @@ export function AppProvider({ children }) {
         const cleanedTransactions = prev.transactions.filter(
           (t) => t.id !== 'tx_salary_init' && !t.id?.startsWith('income-salary-'),
         )
-        return {
+        const updated = {
           ...prev,
           profile: { ...prev.profile, monthlyIncome: value },
           transactions: cleanedTransactions,
         }
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+        } catch {}
+        return updated
       })
       if (session?.isFirebaseUser && session?.uid) {
         updateProfileFirestore(session.uid, { monthlyIncome: value }).catch(console.error)
@@ -623,10 +646,16 @@ export function AppProvider({ children }) {
   const setOpeningBalance = useCallback(
     (amount) => {
       const value = Math.round(Number(amount) || 0)
-      setState((prev) => ({
-        ...prev,
-        profile: { ...prev.profile, openingBalance: value },
-      }))
+      setState((prev) => {
+        const updated = {
+          ...prev,
+          profile: { ...prev.profile, openingBalance: value },
+        }
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+        } catch {}
+        return updated
+      })
       if (session?.isFirebaseUser && session?.uid) {
         updateProfileFirestore(session.uid, { openingBalance: value }).catch(console.error)
       }
