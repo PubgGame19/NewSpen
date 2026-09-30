@@ -243,7 +243,7 @@ export default function Insights() {
           <CardHeader
             eyebrow="Score"
             title="Financial Score"
-            subtitle="Average of four money-health pillars"
+            subtitle="Average of three money-health pillars"
           />
           <div className="mt-5 flex flex-col items-center gap-5">
             <ScoreRing

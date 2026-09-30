@@ -829,11 +829,16 @@ export function AppProvider({ children }) {
       0,
     )
 
+    const dynamicDebtToIncome = totalIncome > 0
+      ? ratioPercent(emiTotal, totalIncome)
+      : (Number(profile.debtToIncome) || 0)
+
     const score = financialScore({
       savingsRate,
       budgetUsage: budgetUsagePercent,
-      debtToIncome: profile.debtToIncome,
+      debtToIncome: dynamicDebtToIncome,
       monthlyExpenses: totalExpenses,
+      hasActiveLoans: activeLoans.length > 0,
       hasTransactions: transactions.length > 0 || totalIncome > 0,
     })
 
@@ -929,6 +934,7 @@ export function AppProvider({ children }) {
       largestCategory: largest,
       emiTotal,
       loanOutstanding,
+      debtToIncome: dynamicDebtToIncome,
       score,
       scoreLabel: scoreLabel(score.total),
       monthlySeries,

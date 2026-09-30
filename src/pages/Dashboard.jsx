@@ -76,8 +76,8 @@ const HEALTH_ROWS = [
     label: 'Debt-to-Income',
     hint: 'EMIs vs monthly income',
     bar: 'bg-amber-500',
-    pick: (m) => m?.profile?.debtToIncome || 0,
-    display: (m) => `${m?.profile?.debtToIncome || 0}%`,
+    pick: (m) => m?.debtToIncome ?? m?.profile?.debtToIncome ?? 0,
+    display: (m) => `${((m?.debtToIncome ?? m?.profile?.debtToIncome) || 0).toFixed(1)}%`,
     scale: 50,
   },
 ]

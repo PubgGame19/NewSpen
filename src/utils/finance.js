@@ -91,6 +91,7 @@ export function financialScore({
   budgetUsage = 0,
   debtToIncome = 0,
   monthlyExpenses = 0,
+  hasActiveLoans = false,
   hasTransactions = false,
 }) {
   if (!hasTransactions && monthlyExpenses === 0 && savingsRate === 0) {
@@ -104,17 +105,56 @@ export function financialScore({
     }
   }
 
-  const savings = clamp((savingsRate / 40) * 100)
-  const budget = clamp(164 - budgetUsage)
-  const debt = clamp(100 - debtToIncome)
-  const total = Math.round((savings + budget + debt) / 3)
+  // 1. Savings Discipline: continuous curve across 0% to 100% savings rate
+  let savingsVal = 0
+  if (savingsRate > 0) {
+    if (savingsRate <= 25) {
+      savingsVal = (savingsRate / 25) * 65
+    } else if (savingsRate <= 60) {
+      savingsVal = 65 + ((savingsRate - 25) / 35) * 25
+    } else {
+      savingsVal = 90 + ((savingsRate - 60) / 40) * 9
+    }
+  }
+  const savings = clamp(Math.round(savingsVal), 0, 99)
+
+  // 2. Budget Control: dynamically scales with pacing and envelope usage
+  let budgetVal = 70
+  if (budgetUsage <= 0) {
+    budgetVal = hasTransactions ? 80 : 50
+  } else if (budgetUsage <= 65) {
+    budgetVal = 75 + (budgetUsage / 65) * 20
+  } else if (budgetUsage <= 100) {
+    budgetVal = 95 - ((budgetUsage - 65) / 35) * 23
+  } else {
+    budgetVal = Math.max(10, 72 - (budgetUsage - 100) * 1.4)
+  }
+  const budget = clamp(Math.round(budgetVal), 10, 98)
+
+  // 3. Debt Management: dynamically responds to EMI-to-income burden
+  let debtVal = 92
+  if (debtToIncome > 0) {
+    if (debtToIncome <= 30) {
+      debtVal = 94 - (debtToIncome / 30) * 26
+    } else if (debtToIncome <= 60) {
+      debtVal = 68 - ((debtToIncome - 30) / 30) * 38
+    } else {
+      debtVal = Math.max(10, 30 - (debtToIncome - 60) * 1.2)
+    }
+  } else if (hasActiveLoans) {
+    debtVal = 94
+  }
+  const debt = clamp(Math.round(debtVal), 10, 98)
+
+  // Composite score: weighted average of the 3 pillars
+  const total = clamp(Math.round((savings + budget + debt) / 3), 0, 100)
 
   return {
-    total: clamp(total),
+    total,
     pillars: [
-      { key: 'savings', label: 'Savings discipline', value: Math.round(savings) },
-      { key: 'budget', label: 'Budget control', value: Math.round(budget) },
-      { key: 'debt', label: 'Debt management', value: Math.round(debt) },
+      { key: 'savings', label: 'Savings discipline', value: savings },
+      { key: 'budget', label: 'Budget control', value: budget },
+      { key: 'debt', label: 'Debt management', value: debt },
     ],
   }
 }
