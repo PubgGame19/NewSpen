@@ -6,7 +6,6 @@ import {
   CreditCard,
   Gauge,
   Info,
-  KeyRound,
   Landmark,
   PiggyBank,
   ShieldCheck,
@@ -106,13 +105,6 @@ export default function AIConsultant() {
               Smart Advisor Active
             </Badge>
           )}
-          <Button
-            variant="outline"
-            icon={KeyRound}
-            onClick={() => navigate('/settings')}
-          >
-            {isGeminiConfigured() ? 'Manage API Key' : 'Connect Gemini API'}
-          </Button>
           <Button
             variant="ghost"
             icon={CreditCard}

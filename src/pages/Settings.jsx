@@ -4,34 +4,21 @@ import {
   Check,
   Database,
   Download,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  KeyRound,
   Mail,
   Moon,
   Palette,
   Phone,
   RotateCcw,
   Save,
-  ShieldCheck,
-  Sparkles,
   Sun,
   UserRound,
   Wallet,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { formatINR } from '../utils/format'
-import {
-  getGeminiApiKey,
-  setGeminiApiKey,
-  isGeminiConfigured,
-  testGeminiApiKey,
-} from '../services/geminiService'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Card, { CardHeader } from '../components/ui/Card'
-import Modal from '../components/ui/Modal'
 import Switch from '../components/ui/Switch'
 
 const CURRENCIES = [
@@ -57,51 +44,50 @@ export default function Settings() {
     isFirebaseConfigured,
   } = useApp()
 
+  // Use actual logged-in user credentials if available
+  const effectiveName =
+    profile.name && profile.name !== 'User'
+      ? profile.name
+      : session?.name && session.name !== 'User'
+        ? session.name
+        : ''
+
+  const effectiveEmail = profile.email || session?.email || ''
+
   const [draft, setDraft] = useState({
-    name: profile.name,
-    email: profile.email,
-    phone: profile.phone,
-    city: profile.city,
-    monthlyIncome: profile.monthlyIncome,
-    currency: profile.currency,
+    name: effectiveName,
+    email: effectiveEmail,
+    phone: profile.phone || '',
+    city: profile.city || '',
+    monthlyIncome: profile.monthlyIncome || '',
+    currency: profile.currency || 'INR',
   })
-  const [resetOpen, setResetOpen] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  /* Gemini AI state */
-  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getGeminiApiKey())
-  const [showGeminiKey, setShowGeminiKey] = useState(false)
-  const [geminiTesting, setGeminiTesting] = useState(false)
-  const [isGeminiActive, setIsGeminiActive] = useState(() => isGeminiConfigured())
-
-  /* Re-sync only when the saved profile fields change (not when an unrelated
-     preference such as a notification toggle is updated), so unsaved edits
-     are never discarded. */
-  const {
-    name: savedName,
-    email: savedEmail,
-    phone: savedPhone,
-    city: savedCity,
-    monthlyIncome: savedIncome,
-    currency: savedCurrency,
-  } = profile
-
+  /* Re-sync when profile or session changes */
   useEffect(() => {
     setDraft({
-      name: savedName,
-      email: savedEmail,
-      phone: savedPhone,
-      city: savedCity,
-      monthlyIncome: savedIncome,
-      currency: savedCurrency,
+      name:
+        profile.name && profile.name !== 'User'
+          ? profile.name
+          : session?.name && session.name !== 'User'
+            ? session.name
+            : '',
+      email: profile.email || session?.email || '',
+      phone: profile.phone || '',
+      city: profile.city || '',
+      monthlyIncome: profile.monthlyIncome || '',
+      currency: profile.currency || 'INR',
     })
   }, [
-    savedName,
-    savedEmail,
-    savedPhone,
-    savedCity,
-    savedIncome,
-    savedCurrency,
+    profile.name,
+    profile.email,
+    profile.phone,
+    profile.city,
+    profile.monthlyIncome,
+    profile.currency,
+    session?.name,
+    session?.email,
   ])
 
   const notifications = profile.notifications || {
@@ -110,24 +96,24 @@ export default function Settings() {
     monthlyReports: false,
   }
 
-  const initials = draft.name
+  const initials = (draft.name || session?.name || 'U')
     .split(' ')
     .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase()
+    .toUpperCase() || 'U'
 
   const nameChanged =
-    draft.name !== profile.name ||
-    draft.email !== profile.email ||
-    draft.phone !== profile.phone ||
-    draft.city !== profile.city ||
-    Number(draft.monthlyIncome) !== Number(profile.monthlyIncome) ||
-    draft.currency !== profile.currency
+    draft.name !== (profile.name || '') ||
+    draft.email !== (profile.email || '') ||
+    draft.phone !== (profile.phone || '') ||
+    draft.city !== (profile.city || '') ||
+    Number(draft.monthlyIncome) !== Number(profile.monthlyIncome || 0) ||
+    draft.currency !== (profile.currency || 'INR')
 
   const saveProfile = () => {
-    const nextIncome = Math.max(1, Number(draft.monthlyIncome) || 0)
+    const nextIncome = Math.max(0, Number(draft.monthlyIncome) || 0)
     const incomeChanged = nextIncome !== Number(profile.monthlyIncome)
 
     updateProfile({
@@ -144,7 +130,7 @@ export default function Settings() {
     pushToast({
       title: 'Settings saved',
       body: incomeChanged
-        ? `Profile updated · salary credit synced to ${formatINR(nextIncome)}.`
+        ? `Profile updated · monthly income set to ${formatINR(nextIncome)}.`
         : 'Profile, income and currency preferences updated.',
       tone: 'emerald',
     })
@@ -158,7 +144,7 @@ export default function Settings() {
   const exportData = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
-      user: profile.name,
+      user: draft.name || profile.name || 'User',
       transactions,
       budgets,
       summary: { savingsRate: Number(savingsRate.toFixed(1)), score: score.total },
@@ -181,51 +167,6 @@ export default function Settings() {
     })
   }
 
-  const handleSaveGeminiKey = async () => {
-    const trimmed = geminiKeyInput.trim()
-    if (!trimmed) {
-      setGeminiApiKey('')
-      setIsGeminiActive(false)
-      pushToast({
-        title: 'Gemini Key Removed',
-        body: 'SPENANCE AI will use the built-in offline financial model.',
-        tone: 'amber',
-      })
-      return
-    }
-
-    setGeminiTesting(true)
-    const result = await testGeminiApiKey(trimmed)
-    setGeminiTesting(false)
-
-    if (result.success) {
-      setGeminiApiKey(trimmed)
-      setIsGeminiActive(true)
-      pushToast({
-        title: 'Google Gemini Pro Connected! ⚡',
-        body: 'Real-time AI reasoning enabled across all your financial accounts and loans.',
-        tone: 'emerald',
-      })
-    } else {
-      pushToast({
-        title: 'Gemini Key Verification Failed',
-        body: result.error || 'Please check that your API key is valid.',
-        tone: 'rose',
-      })
-    }
-  }
-
-  const handleClearGeminiKey = () => {
-    setGeminiApiKey('')
-    setGeminiKeyInput('')
-    setIsGeminiActive(false)
-    pushToast({
-      title: 'API Key Cleared',
-      body: 'Switched to built-in offline financial rules.',
-      tone: 'slate',
-    })
-  }
-
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-4">
@@ -234,7 +175,7 @@ export default function Settings() {
             Settings
           </h2>
           <p className="muted mt-1 text-[13px] sm:text-sm">
-            Manage your profile, preferences and account settings.
+            Manage your personal profile, monthly income, notifications, and storage.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -257,18 +198,29 @@ export default function Settings() {
           <CardHeader
             eyebrow="Profile"
             title="Personal details"
-            subtitle="Used across the whole app — the dashboard greeting updates too."
+            subtitle="Used across SPENANCE — your dashboard greeting and reports update automatically."
             action={<UserRound size={18} className="text-slate-400" />}
           />
 
           <div className="mt-5 flex items-center gap-4">
-            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-lg font-bold text-white">
-              {initials || profile.initials}
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-lg font-bold text-white shadow-sm">
+              {initials}
             </span>
             <div>
-              <p className="heading text-[15px] font-semibold">{draft.name}</p>
+              <p className="heading text-[15px] font-semibold">
+                {draft.name || session?.name || 'Personal Account'}
+              </p>
               <p className="muted text-[12px]">
-                {profile.accountType} · Member since {profile.memberSince}
+                {session?.isFirebaseUser ? 'Firebase Cloud Account' : 'Personal Account'} · Member since{' '}
+                {session?.signedInAt
+                  ? new Date(session.signedInAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : new Date().toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
               </p>
             </div>
           </div>
@@ -281,6 +233,7 @@ export default function Settings() {
               <input
                 id="set-name"
                 className="input"
+                placeholder="e.g. Alex Morgan"
                 value={draft.name}
                 onChange={(event) =>
                   setDraft((prev) => ({ ...prev, name: event.target.value }))
@@ -301,6 +254,7 @@ export default function Settings() {
                   id="set-email"
                   type="email"
                   className="input pr-10"
+                  placeholder="e.g. alex@example.com"
                   value={draft.email}
                   onChange={(event) =>
                     setDraft((prev) => ({ ...prev, email: event.target.value }))
@@ -311,7 +265,7 @@ export default function Settings() {
 
             <div>
               <label className="eyebrow mb-1.5 block" htmlFor="set-phone">
-                Phone
+                Phone number
               </label>
               <div className="relative">
                 <Phone
@@ -321,6 +275,7 @@ export default function Settings() {
                 <input
                   id="set-phone"
                   className="input pr-10"
+                  placeholder="e.g. +91 98765 43210"
                   value={draft.phone}
                   onChange={(event) =>
                     setDraft((prev) => ({ ...prev, phone: event.target.value }))
@@ -331,11 +286,12 @@ export default function Settings() {
 
             <div>
               <label className="eyebrow mb-1.5 block" htmlFor="set-city">
-                Location
+                City / Location
               </label>
               <input
                 id="set-city"
                 className="input"
+                placeholder="e.g. Mumbai, India"
                 value={draft.city}
                 onChange={(event) =>
                   setDraft((prev) => ({ ...prev, city: event.target.value }))
@@ -367,6 +323,7 @@ export default function Settings() {
                   type="number"
                   min="0"
                   step="any"
+                  placeholder="e.g. 50000"
                   className="input tabular pl-8"
                   value={draft.monthlyIncome}
                   onChange={(event) =>
@@ -378,7 +335,7 @@ export default function Settings() {
                 />
               </div>
               <p className="muted mt-1.5 text-[11px]">
-                Currently {formatINR(profile.monthlyIncome)} · savings rate{' '}
+                Currently {formatINR(profile.monthlyIncome || 0)} · savings rate{' '}
                 {savingsRate.toFixed(1)}%
               </p>
             </div>
@@ -527,56 +484,50 @@ export default function Settings() {
         </Card>
 
         {/* --------------------------------------------------------- data */}
-        <Card className="card-pad animate-rise">
+        <Card className="card-pad animate-rise xl:col-span-3">
           <CardHeader
             eyebrow={isFirebaseConfigured && session?.isFirebaseUser ? 'Cloud Sync' : 'Local Storage'}
             title="Database & Storage"
             subtitle={
               isFirebaseConfigured && session?.isFirebaseUser
                 ? 'Your data is synchronized in real-time with Google Cloud Firestore.'
-                : 'Running in local browser storage mode. Add Firebase keys in .env to enable Cloud DB.'
+                : 'Running in local browser storage mode. Add Firebase credentials to enable Cloud database.'
             }
             action={<Database size={18} className="text-slate-400" />}
           />
 
-          <dl className="mt-5 space-y-2 text-[12px]">
-            <div className="flex items-center justify-between">
+          <dl className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4 text-[12px]">
+            <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-800">
               <dt className="muted font-medium">Backend status</dt>
-              <dd className="tabular heading font-semibold">
+              <dd className="tabular heading font-semibold mt-1">
                 <span className={`inline-flex items-center gap-1.5 ${isFirebaseConfigured ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   <span className={`h-2 w-2 rounded-full ${isFirebaseConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  {isFirebaseConfigured ? 'Cloud Firestore Active' : 'Local Storage'}
+                  {isFirebaseConfigured ? 'Cloud Firestore' : 'Local Storage'}
                 </span>
               </dd>
             </div>
-            {session?.isFirebaseUser ? (
-              <div className="flex items-center justify-between">
-                <dt className="muted font-medium">Synced account</dt>
-                <dd className="tabular heading font-semibold truncate max-w-[150px]">
-                  {session.email}
-                </dd>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between">
-              <dt className="muted font-medium">Transactions</dt>
-              <dd className="tabular heading font-semibold">
+            <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-800">
+              <dt className="muted font-medium">Recorded Transactions</dt>
+              <dd className="tabular heading font-semibold mt-1 text-base">
                 {transactions.length}
               </dd>
             </div>
-            <div className="flex items-center justify-between">
-              <dt className="muted font-medium">Budget categories</dt>
-              <dd className="tabular heading font-semibold">
-                {Object.keys(budgets).length}
+            <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-800">
+              <dt className="muted font-medium">Budget Envelopes</dt>
+              <dd className="tabular heading font-semibold mt-1 text-base">
+                {Object.keys(budgets).length} categories
               </dd>
             </div>
-            <div className="flex items-center justify-between">
-              <dt className="muted font-medium">Financial score</dt>
-              <dd className="tabular heading font-semibold">{score.total}/100</dd>
+            <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-800">
+              <dt className="muted font-medium">Financial Health Score</dt>
+              <dd className="tabular heading font-semibold mt-1 text-base">
+                {score.total}/100
+              </dd>
             </div>
           </dl>
 
-          <div className="mt-5 flex flex-col gap-2">
-            <Button variant="outline" icon={Download} onClick={exportData} className="w-full">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Button variant="outline" icon={Download} onClick={exportData}>
               Export my data (JSON)
             </Button>
             <Button
@@ -592,7 +543,7 @@ export default function Settings() {
                   })
                 }
               }}
-              className="w-full text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
+              className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
             >
               Reset all data to zero
             </Button>
@@ -600,113 +551,9 @@ export default function Settings() {
 
           <p className="muted mt-4 text-[11px] leading-snug">
             {isFirebaseConfigured
-              ? 'Changes update instantly in Cloud Firestore and sync across all devices.'
+              ? 'Changes update instantly in Cloud Firestore and sync across all logged-in devices.'
               : 'Add your Firebase configuration to .env to turn this into a live multi-user Cloud database!'}
           </p>
-        </Card>
-
-        {/* ----------------------------------------------------- Gemini AI */}
-        <Card className="card-pad animate-rise xl:col-span-2">
-          <CardHeader
-            eyebrow="Artificial Intelligence"
-            title="Google Gemini AI Engine"
-            subtitle="Connects Gemini 1.5 Pro to conduct live, real-time portfolio audits and financial coaching."
-            action={<Sparkles size={18} className="text-emerald-500" />}
-          />
-
-          <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-4">
-              <div>
-                <label className="eyebrow mb-1.5 block" htmlFor="gemini-key">
-                  Gemini API Key
-                </label>
-                <div className="relative flex items-center">
-                  <span className="pointer-events-none absolute left-3 text-slate-400">
-                    <KeyRound size={16} />
-                  </span>
-                  <input
-                    id="gemini-key"
-                    type={showGeminiKey ? 'text' : 'password'}
-                    placeholder="AIzaSy..."
-                    value={geminiKeyInput}
-                    onChange={(e) => setGeminiKeyInput(e.target.value)}
-                    className="input pl-9 pr-10 font-mono text-[13px]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGeminiKey((prev) => !prev)}
-                    className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                    title={showGeminiKey ? 'Hide key' : 'Show key'}
-                  >
-                    {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <p className="muted mt-2 text-[11px]">
-                  Keys are stored locally in your browser. Get your free key from{' '}
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-emerald-600 hover:underline dark:text-emerald-400 inline-flex items-center gap-0.5"
-                  >
-                    Google AI Studio <ExternalLink size={10} />
-                  </a>
-                  .
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  variant="primary"
-                  icon={Save}
-                  onClick={handleSaveGeminiKey}
-                  disabled={geminiTesting}
-                >
-                  {geminiTesting ? 'Verifying Key...' : 'Test & Save Key'}
-                </Button>
-                {isGeminiActive ? (
-                  <Button
-                    variant="ghost"
-                    onClick={handleClearGeminiKey}
-                    className="text-slate-500 hover:text-rose-600"
-                  >
-                    Remove Key
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
-              <p className="heading text-[12px] font-semibold uppercase tracking-wider text-slate-500">
-                AI Engine Status
-              </p>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    isGeminiActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                  }`}
-                />
-                <span className="heading text-[13px] font-bold">
-                  {isGeminiActive ? 'Gemini 1.5 Pro Connected' : 'Offline Rule Engine'}
-                </span>
-              </div>
-              <p className="muted text-[11px] leading-relaxed">
-                {isGeminiActive
-                  ? 'Your AI Consultant analyzes live transaction streams, debt-to-income, and savings trajectory with Google Gemini Pro.'
-                  : 'Without an API key, the assistant falls back to built-in financial heuristics. Add a free Gemini key above to unlock full generative AI.'}
-              </p>
-              <div className="pt-1 border-t border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="muted">Primary Model</span>
-                  <span className="heading font-mono font-medium">gemini-1.5-pro</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] mt-1">
-                  <span className="muted">Fallback Model</span>
-                  <span className="heading font-mono font-medium">gemini-1.5-flash</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </Card>
       </div>
     </div>
