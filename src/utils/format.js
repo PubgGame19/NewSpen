@@ -106,8 +106,8 @@ export function formatLongDate(iso) {
   } ${d.getFullYear()}`
 }
 
-/** Days between today (demo clock) and an ISO date */
-export function daysUntil(iso, from = new Date('2026-09-27T00:00:00')) {
+/** Days between today and an ISO date */
+export function daysUntil(iso, from = new Date()) {
   const target = new Date(`${iso}T00:00:00`)
   return Math.round((target - from) / 86400000)
 }

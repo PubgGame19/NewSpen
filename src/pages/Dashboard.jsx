@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bar,
@@ -15,8 +16,10 @@ import {
   ArrowRight,
   BellRing,
   CalendarClock,
+  Check,
   CreditCard,
   Landmark,
+  Pencil,
   PiggyBank,
   Plus,
   Sparkles,
@@ -45,6 +48,7 @@ import ProgressBar from '../components/ui/ProgressBar'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card, { CardHeader } from '../components/ui/Card'
+import Modal from '../components/ui/Modal'
 import TransactionList from '../components/TransactionList'
 import CategoryIcon from '../components/CategoryIcon'
 
@@ -54,17 +58,17 @@ const HEALTH_ROWS = [
     label: 'Savings Rate',
     hint: 'of monthly income saved',
     bar: 'bg-emerald-500',
-    pick: (m) => m.savingsRate,
-    display: (m) => formatPercent(m.savingsRate),
+    pick: (m) => m?.savingsRate || 0,
+    display: (m) => formatPercent(m?.savingsRate || 0),
     scale: 100,
   },
   {
     key: 'budget',
     label: 'Monthly Budget Usage',
-    hint: 'of the ₹35,000 envelope',
+    hint: 'of monthly envelopes',
     bar: 'bg-sky-500',
-    pick: (m) => m.budgetUsagePercent,
-    display: (m) => formatPercentDown(m.budgetUsagePercent),
+    pick: (m) => m?.budgetUsagePercent || 0,
+    display: (m) => formatPercentDown(m?.budgetUsagePercent || 0),
     scale: 100,
   },
   {
@@ -72,8 +76,8 @@ const HEALTH_ROWS = [
     label: 'Debt-to-Income',
     hint: 'EMIs vs monthly income',
     bar: 'bg-amber-500',
-    pick: (m) => m.profile.debtToIncome,
-    display: (m) => `${m.profile.debtToIncome}%`,
+    pick: (m) => m?.profile?.debtToIncome || 0,
+    display: (m) => `${m?.profile?.debtToIncome || 0}%`,
     scale: 50,
   },
 ]
@@ -82,6 +86,7 @@ export default function Dashboard() {
   const metrics = useApp()
   const {
     profile,
+    session,
     transactions,
     totalIncome,
     monthlySeries,
@@ -97,9 +102,54 @@ export default function Dashboard() {
     emiTotal,
     openQuickAdd,
     period,
+    loans,
+    setOpeningBalance,
+    setMonthlyIncome,
+    pushToast,
   } = metrics
   const theme = useChartTheme()
   const navigate = useNavigate()
+
+  const [editBalanceOpen, setEditBalanceOpen] = useState(false)
+  const [editIncomeOpen, setEditIncomeOpen] = useState(false)
+  const [draftBalance, setDraftBalance] = useState('')
+  const [draftIncome, setDraftIncome] = useState('')
+
+  const openBalanceModal = () => {
+    setDraftBalance(String(profile.openingBalance || ''))
+    setEditBalanceOpen(true)
+  }
+
+  const openIncomeModal = () => {
+    setDraftIncome(String(profile.monthlyIncome || ''))
+    setEditIncomeOpen(true)
+  }
+
+  const handleSaveBalance = (e) => {
+    e?.preventDefault()
+    const val = Math.max(0, Number(draftBalance) || 0)
+    setOpeningBalance(val)
+    setEditBalanceOpen(false)
+    pushToast({
+      title: 'Bank Balance Updated',
+      body: `Starting balance set to ${formatINR(val)}.`,
+      tone: 'emerald',
+    })
+  }
+
+  const handleSaveIncome = (e) => {
+    e?.preventDefault()
+    const val = Math.max(0, Number(draftIncome) || 0)
+    setMonthlyIncome(val)
+    setEditIncomeOpen(false)
+    pushToast({
+      title: 'Monthly Income Updated',
+      body: `Monthly income set to ${formatINR(val)}.`,
+      tone: 'emerald',
+    })
+  }
+
+  const displayName = session?.name?.split(' ')[0] || profile.firstName || 'there'
 
   /* Salary credit first, then the newest spends */
   const recent = [
@@ -126,30 +176,79 @@ export default function Dashboard() {
     ...monthlySeries.map((row) => row.income - row.expenses),
   ]
 
+  const upcomingPayments = useMemo(() => {
+    if (UPCOMING_PAYMENTS && UPCOMING_PAYMENTS.length > 0) return UPCOMING_PAYMENTS
+    return (loans || [])
+      .filter((loan) => loan.status !== 'Closed' && loan.nextPaymentDate)
+      .map((loan) => ({
+        id: `up-loan-${loan.id}`,
+        title: loan.name,
+        meta: `${loan.lender} · EMI`,
+        amount: loan.emi,
+        dueDate: loan.nextPaymentDate,
+        kind: 'loan',
+      }))
+  }, [loans])
+
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------- hero */}
       <section className="animate-rise flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="heading text-xl font-bold tracking-tight sm:text-2xl">
-            {greeting()}, {profile.firstName} 👋
+            {greeting()}, {displayName} 👋
           </h2>
           <p className="muted mt-1 text-[13px] sm:text-sm">
             Here's your financial overview for {period}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="emerald" icon={Sparkles}>
+          <Badge tone={score.total > 0 ? 'emerald' : 'slate'} icon={Sparkles}>
             Financial score {score.total}/100
           </Badge>
           <Button variant="ghost" size="sm" icon={BellRing}>
             {emiTotal ? formatINR(emiTotal) : '₹0'} EMIs this month
           </Button>
           <Button size="sm" icon={Plus} onClick={openQuickAdd}>
-            Add Expense
+            Add Transaction
           </Button>
         </div>
       </section>
+
+      {/* ------------------------------------------- quick setup banner */}
+      {balance === 0 && !(profile.monthlyIncome || totalIncome) && transactions.length === 0 && (
+        <Card className="p-5 sm:p-6 border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 via-transparent to-sky-500/5 animate-rise">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="max-w-xl">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                <Sparkles size={12} /> Quick Setup
+              </span>
+              <h3 className="heading text-base font-bold sm:text-lg mt-1.5">
+                Set up your personal finances
+              </h3>
+              <p className="muted text-[12.5px] mt-1">
+                Enter your current bank balance and monthly income to start seeing real cash-flow, savings metrics, and financial score.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                variant="primary"
+                icon={Wallet}
+                onClick={openBalanceModal}
+              >
+                Set Bank Balance
+              </Button>
+              <Button
+                variant="outline"
+                icon={TrendingUp}
+                onClick={openIncomeModal}
+              >
+                Set Monthly Income
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* --------------------------------------------------------- stats */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -160,15 +259,35 @@ export default function Dashboard() {
           deltaLabel="from last month"
           icon={Wallet}
           tone="emerald"
-          spark={[31200, 36400, 40900, 47700, 48475, balance]}
+          action={
+            <button
+              type="button"
+              onClick={openBalanceModal}
+              className="rounded-md p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition cursor-pointer"
+              title="Set Starting / Bank Balance"
+            >
+              <Pencil size={11} />
+            </button>
+          }
+          spark={balanceTrend.length ? balanceTrend : [0, 0, 0, 0, 0, balance]}
         />
         <StatCard
           label="Monthly Income"
-          value={formatINR(profile.monthlyIncome)}
+          value={formatINR(profile.monthlyIncome || totalIncome)}
           delta={deltas.income.value}
           deltaLabel="This month"
           icon={TrendingUp}
           tone="sky"
+          action={
+            <button
+              type="button"
+              onClick={openIncomeModal}
+              className="rounded-md p-1 text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition cursor-pointer"
+              title="Set Monthly Salary / Income"
+            >
+              <Pencil size={11} />
+            </button>
+          }
           spark={[...monthlySeries.slice(0, 5).map((row) => row.income), totalIncome]}
         />
         <StatCard
@@ -234,7 +353,7 @@ export default function Dashboard() {
           <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
             <Badge tone={scoreLabel.tone}>{scoreLabel.label}</Badge>
             <span className="muted text-[11px] font-medium">
-              Updated {period.split(' ')[0]} 2026
+              Updated {period}
             </span>
           </div>
         </Card>
@@ -424,7 +543,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
               <p className="muted text-[10px] font-semibold uppercase tracking-wide">
-                September
+                {period.split(' ')[0]}
               </p>
               <p className="tabular heading text-lg font-bold">
                 {formatINR(totalExpenses)}
@@ -479,71 +598,83 @@ export default function Dashboard() {
         <Card className="card-pad animate-rise">
           <CardHeader
             title="Upcoming Payments"
-            subtitle="Next 15 days · October 2026"
+            subtitle="Scheduled dues & EMIs"
             action={<CalendarClock size={18} className="text-slate-400" />}
           />
 
-          <ul className="mt-4 space-y-3">
-            {UPCOMING_PAYMENTS.map((payment) => {
-              const days = daysUntil(payment.dueDate)
-              const soon = days <= 7
-              return (
-                <li
-                  key={payment.id}
-                  className="flex items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-3 transition hover:border-slate-300 hover:bg-slate-50/70 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-800/40"
-                >
-                  <span
-                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-                      payment.kind === 'loan'
-                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
-                        : payment.kind === 'bill'
-                          ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'
-                          : 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300'
-                    }`}
+          {upcomingPayments.length > 0 ? (
+            <ul className="mt-4 space-y-3">
+              {upcomingPayments.map((payment) => {
+                const days = daysUntil(payment.dueDate)
+                const soon = days <= 7
+                return (
+                  <li
+                    key={payment.id}
+                    className="flex items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-3 transition hover:border-slate-300 hover:bg-slate-50/70 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-800/40"
                   >
-                    {payment.kind === 'loan' ? (
-                      <Landmark size={18} strokeWidth={2.1} />
-                    ) : (
-                      <CreditCard size={18} strokeWidth={2.1} />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="heading truncate text-[13px] font-semibold">
-                      {payment.title}
-                    </p>
-                    <p className="muted text-[11px]">
-                      Due {formatLongDate(payment.dueDate)}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="tabular heading text-[13px] font-bold">
-                      {formatINR(payment.amount)}
-                    </p>
-                    <p
-                      className={`text-[10px] font-semibold ${
-                        soon
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-slate-400'
+                    <span
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                        payment.kind === 'loan'
+                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          : payment.kind === 'bill'
+                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'
+                            : 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300'
                       }`}
                     >
-                      in {days} days
-                    </p>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                      {payment.kind === 'loan' ? (
+                        <Landmark size={18} strokeWidth={2.1} />
+                      ) : (
+                        <CreditCard size={18} strokeWidth={2.1} />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="heading truncate text-[13px] font-semibold">
+                        {payment.title}
+                      </p>
+                      <p className="muted text-[11px]">
+                        Due {formatLongDate(payment.dueDate)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="tabular heading text-[13px] font-bold">
+                        {formatINR(payment.amount)}
+                      </p>
+                      <p
+                        className={`text-[10px] font-semibold ${
+                          soon
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        in {days} days
+                      </p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <div className="mt-4 py-8 text-center">
+              <CalendarClock size={28} className="mx-auto text-slate-300 dark:text-slate-600" />
+              <p className="heading mt-2 text-xs font-semibold">No scheduled payments</p>
+              <p className="muted mt-1 text-[11px]">
+                Active loans and scheduled EMIs will appear here automatically.
+              </p>
+            </div>
+          )}
 
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-950/40">
-            <span className="muted text-[11px] font-semibold uppercase tracking-wide">
-              Total due
-            </span>
-            <span className="tabular heading text-sm font-bold">
-              {formatINR(
-                UPCOMING_PAYMENTS.reduce((sum, p) => sum + p.amount, 0),
-              )}
-            </span>
-          </div>
+          {upcomingPayments.length > 0 && (
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-950/40">
+              <span className="muted text-[11px] font-semibold uppercase tracking-wide">
+                Total due
+              </span>
+              <span className="tabular heading text-sm font-bold">
+                {formatINR(
+                  upcomingPayments.reduce((sum, p) => sum + p.amount, 0),
+                )}
+              </span>
+            </div>
+          )}
         </Card>
       </section>
 
@@ -589,6 +720,100 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {/* Edit Starting Balance Modal */}
+      <Modal
+        open={editBalanceOpen}
+        onClose={() => setEditBalanceOpen(false)}
+        title="Set Bank / Starting Balance"
+        description="Set your current opening balance across your bank accounts and wallets."
+        icon={Wallet}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditBalanceOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={Check} type="submit" form="edit-balance-form">
+              Save Balance
+            </Button>
+          </>
+        }
+      >
+        <form id="edit-balance-form" onSubmit={handleSaveBalance} className="space-y-4">
+          <div>
+            <label className="eyebrow block mb-1.5" htmlFor="input-starting-balance">
+              Available Bank / Cash Balance (₹)
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
+                ₹
+              </span>
+              <input
+                id="input-starting-balance"
+                type="number"
+                min="0"
+                step="any"
+                required
+                autoFocus
+                placeholder="e.g. 50000"
+                value={draftBalance}
+                onChange={(e) => setDraftBalance(e.target.value)}
+                className="input tabular pl-8 text-base font-bold"
+              />
+            </div>
+            <p className="muted mt-2 text-[11.5px] leading-relaxed">
+              Future transactions will automatically add to or deduct from this opening balance.
+            </p>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Monthly Income Modal */}
+      <Modal
+        open={editIncomeOpen}
+        onClose={() => setEditIncomeOpen(false)}
+        title="Set Monthly Salary / Income"
+        description="Used to benchmark your 50/30/20 budget limits, savings rate, and financial health."
+        icon={TrendingUp}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditIncomeOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={Check} type="submit" form="edit-income-form">
+              Save Income
+            </Button>
+          </>
+        }
+      >
+        <form id="edit-income-form" onSubmit={handleSaveIncome} className="space-y-4">
+          <div>
+            <label className="eyebrow block mb-1.5" htmlFor="input-monthly-income">
+              Monthly Salary / Income (₹)
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
+                ₹
+              </span>
+              <input
+                id="input-monthly-income"
+                type="number"
+                min="0"
+                step="any"
+                required
+                autoFocus
+                placeholder="e.g. 75000"
+                value={draftIncome}
+                onChange={(e) => setDraftIncome(e.target.value)}
+                className="input tabular pl-8 text-base font-bold"
+              />
+            </div>
+            <p className="muted mt-2 text-[11.5px] leading-relaxed">
+              This updates your baseline monthly income and automatically syncs across all financial analytics.
+            </p>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

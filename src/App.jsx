@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
 import Expenses from './pages/Expenses'
@@ -25,7 +26,8 @@ function RequireAuth({ children }) {
 
 export default function App() {
   return (
-    <AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
       <BrowserRouter
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
@@ -50,5 +52,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AppProvider>
+    </ErrorBoundary>
   )
 }

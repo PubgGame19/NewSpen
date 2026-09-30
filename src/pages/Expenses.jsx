@@ -12,14 +12,18 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  AlertTriangle,
   BarChart3,
   CalendarRange,
   CreditCard,
+  FileSpreadsheet,
   Filter,
   Plus,
   Receipt,
+  Repeat,
   Search,
   Tag,
+  Trash2,
   TrendingUp,
   X,
 } from 'lucide-react'
@@ -41,6 +45,7 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionRow from '../components/TransactionRow'
 import TransactionList from '../components/TransactionList'
 import CategoryIcon from '../components/CategoryIcon'
+import ImportStatementModal from '../components/ImportStatementModal'
 
 export default function Expenses() {
   const {
@@ -51,10 +56,15 @@ export default function Expenses() {
     categoryTotals,
     dailySeries,
     weeklySeries,
+    addTransactionsBatch,
+    updateTransaction,
     deleteTransaction,
+    deleteTransactionsByAmount,
+    deleteTransactionsByDescription,
     pushToast,
     period,
     openQuickAdd,
+    openRecurringModal,
   } = useApp()
 
   const theme = useChartTheme()
@@ -63,6 +73,16 @@ export default function Expenses() {
   const [method, setMethod] = useState('All')
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [mode, setMode] = useState('daily')
+  const [importOpen, setImportOpen] = useState(false)
+
+  const handleImportSuccess = async (importedTxns) => {
+    await addTransactionsBatch(importedTxns)
+    pushToast({
+      title: 'Statement Imported! 🚀',
+      body: `Successfully imported ${importedTxns.length} transactions directly into your ledger.`,
+      tone: 'emerald',
+    })
+  }
 
   /* Keep the header search in sync with this page */
   useEffect(() => {
@@ -104,6 +124,34 @@ export default function Expenses() {
     })
   }
 
+  const faulty3048Count = useMemo(
+    () => expenses.filter((t) => Math.abs(t.amount) === 3048).length,
+    [expenses],
+  )
+
+  const placeholderTitleCount = useMemo(
+    () => expenses.filter((t) => t.description === 'Imported Transaction').length,
+    [expenses],
+  )
+
+  const handleCleanup3048 = () => {
+    const count = deleteTransactionsByAmount(3048)
+    pushToast({
+      title: 'Cleaned Up Transactions 🧹',
+      body: `Successfully removed ${count} transactions that had the ₹3,048 account number amount.`,
+      tone: 'emerald',
+    })
+  }
+
+  const handleCleanupPlaceholders = () => {
+    const count = deleteTransactionsByDescription('Imported Transaction')
+    pushToast({
+      title: 'Placeholders Cleared 🧹',
+      body: `Removed ${count} placeholder transactions. Re-import statement to load proper merchant names!`,
+      tone: 'emerald',
+    })
+  }
+
   const clearAll = () => {
     setCategory('All')
     setMethod('All')
@@ -123,9 +171,25 @@ export default function Expenses() {
             Track and understand where your money goes.
           </p>
         </div>
-        <Button icon={Plus} onClick={openQuickAdd}>
-          Add Expense
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            icon={Repeat}
+            onClick={openRecurringModal}
+          >
+            Recurring Bills
+          </Button>
+          <Button
+            variant="outline"
+            icon={FileSpreadsheet}
+            onClick={() => setImportOpen(true)}
+          >
+            Import Statement
+          </Button>
+          <Button icon={Plus} onClick={openQuickAdd}>
+            Add Expense
+          </Button>
+        </div>
       </section>
 
       {/* -------------------------------------------------------- summary */}
@@ -168,8 +232,8 @@ export default function Expenses() {
         title="Spending Trend"
         subtitle={
           mode === 'daily'
-            ? 'Daily spend across September 2026'
-            : 'Weekly totals across September 2026'
+            ? `Daily spend across ${period}`
+            : `Weekly totals across ${period}`
         }
         eyebrow="Pattern"
         height={260}
@@ -319,6 +383,61 @@ export default function Expenses() {
         </ResponsiveContainer>
       </ChartCard>
 
+      {/* ------------------------------------------------ 3048 cleanup banner */}
+      {faulty3048Count > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 animate-rise">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400">
+              <AlertTriangle size={20} />
+            </span>
+            <div>
+              <p className="text-[13.5px] font-bold">
+                Found {faulty3048Count} transactions with amount ₹3,048 from previous bank account column mapping.
+              </p>
+              <p className="text-[12px] opacity-80 mt-0.5">
+                The previous import mapped your bank account ending (e.g. "SBI - 3048") instead of the real Amount column. Clean them up in 1 click and re-import with the fixed parser.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={Trash2}
+            onClick={handleCleanup3048}
+          >
+            Remove {faulty3048Count} Faulty (₹3,048) Records
+          </Button>
+        </div>
+      )}
+
+      {/* ------------------------------------------------ Imported Transaction placeholder banner */}
+      {placeholderTitleCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sky-300 bg-sky-50/90 p-4 text-sky-900 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200 animate-rise">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-500/20 text-sky-700 dark:text-sky-400">
+              <FileSpreadsheet size={20} />
+            </span>
+            <div>
+              <p className="text-[13.5px] font-bold">
+                Found {placeholderTitleCount} transactions showing "Imported Transaction" as title.
+              </p>
+              <p className="text-[12px] opacity-80 mt-0.5">
+                The description parser is now fixed. Click below to clear these placeholder items and re-import with your real merchant names (Swiggy, Uber, etc.).
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Trash2}
+            onClick={handleCleanupPlaceholders}
+            className="border-sky-400 text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:text-sky-200 dark:hover:bg-sky-900/40"
+          >
+            Clear {placeholderTitleCount} Placeholder Records
+          </Button>
+        </div>
+      )}
+
       {/* ------------------------------------------------ filters/search */}
       <Card className="card-pad animate-rise">
         <div className="flex flex-col gap-4">
@@ -449,6 +568,23 @@ export default function Expenses() {
                       key={txn.id}
                       txn={txn}
                       onDelete={handleDelete}
+                      onUpdateCategory={(id, newCat) => {
+                        updateTransaction(id, { category: newCat })
+                        pushToast({
+                          title: 'Category Updated',
+                          body: `Changed category to ${newCat}.`,
+                          tone: 'emerald',
+                        })
+                      }}
+                      onToggleType={(id) => {
+                        const nextAmount = -txn.amount
+                        updateTransaction(id, { amount: nextAmount })
+                        pushToast({
+                          title: nextAmount > 0 ? 'Converted to Income 💰' : 'Converted to Expense 📉',
+                          body: `${txn.description} is now ${nextAmount > 0 ? 'Income (+)' : 'Expense (−)'}.`,
+                          tone: nextAmount > 0 ? 'emerald' : 'amber',
+                        })
+                      }}
                     />
                   ))}
                 </tbody>
@@ -511,7 +647,7 @@ export default function Expenses() {
                   />
                 </div>
                 <p className="muted mt-2 text-[11px] font-medium">
-                  {share.toFixed(1)}% of September spend ·{' '}
+                  {share.toFixed(1)}% of total spend ·{' '}
                   {countFor(name)} transactions
                 </p>
               </div>
@@ -522,9 +658,15 @@ export default function Expenses() {
 
       <p className="muted flex items-center gap-2 text-[11px]">
         <TrendingUp size={13} />
-        Data is stored in your browser only. Latest entry:{" "}
+        Data is synced securely with your account. Latest entry:{" "}
         {filtered[0] ? formatLongDate(filtered[0].date) : '—'}
       </p>
+
+      <ImportStatementModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImportSuccess={handleImportSuccess}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Info,
   PiggyBank,
+  Repeat,
   SlidersHorizontal,
   Target,
   TrendingDown,
@@ -54,13 +55,15 @@ export default function Budget() {
     netSavings,
     savingsRate,
     period,
+    openRecurringModal,
   } = useApp()
   const theme = useChartTheme()
   const [editOpen, setEditOpen] = useState(false)
 
-  const overall = budgetStatus(budgetUsagePercent)
-  const daysInMonth = 30
-  const daysLeft = Math.max(1, daysInMonth - 27)
+  const overall = budgetStatus(budgetUsagePercent, budgetTotal)
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const daysLeft = Math.max(1, daysInMonth - now.getDate())
   const safePerDay = Math.max(0, Math.round(budgetRemaining / daysLeft))
 
   const chartData = categoryRows.map((row) => ({
@@ -73,7 +76,7 @@ export default function Budget() {
     {
       label: 'Monthly Budget',
       value: formatINR(budgetTotal),
-      hint: 'Six category envelopes',
+      hint: budgetTotal > 0 ? 'Six category envelopes' : 'No envelopes configured',
       icon: Target,
       tone: 'emerald',
     },
@@ -87,7 +90,7 @@ export default function Budget() {
     {
       label: 'Remaining',
       value: formatINR(budgetRemaining),
-      hint: `${formatINR(safePerDay)} safe to spend per day`,
+      hint: budgetTotal > 0 ? `${formatINR(safePerDay)} safe to spend per day` : 'No envelope limit',
       icon: PiggyBank,
       tone: 'sky',
     },
@@ -112,12 +115,21 @@ export default function Budget() {
             Stay on track with your spending goals.
           </p>
         </div>
-        <Button
-          icon={SlidersHorizontal}
-          onClick={() => setEditOpen(true)}
-        >
-          Edit Budget
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            icon={Repeat}
+            onClick={openRecurringModal}
+          >
+            Recurring Bills &amp; Salary
+          </Button>
+          <Button
+            icon={SlidersHorizontal}
+            onClick={() => setEditOpen(true)}
+          >
+            Edit Budget
+          </Button>
+        </div>
       </section>
 
       {/* -------------------------------------------------------- overview */}
@@ -161,8 +173,8 @@ export default function Budget() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge
-              tone={overall.key === 'normal' ? 'emerald' : overall.key === 'warning' ? 'amber' : 'rose'}
-              icon={overall.key === 'normal' ? CheckCircle2 : AlertTriangle}
+              tone={overall.tone}
+              icon={overall.key === 'normal' ? CheckCircle2 : Info}
             >
               {overall.label}
             </Badge>

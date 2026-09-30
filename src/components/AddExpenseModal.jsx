@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Calendar, Plus, Tag, Wallet, CreditCard } from 'lucide-react'
-import { CATEGORIES, PAYMENT_METHODS } from '../data/mockData'
+import { AlertCircle, Calendar, Plus, Tag, Wallet, CreditCard, ArrowDownLeft, ArrowUpRight, TrendingUp } from 'lucide-react'
+import { CATEGORIES, INCOME_CATEGORIES, PAYMENT_METHODS } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { budgetStatus } from '../utils/finance'
 import { formatINR, formatLongDate, formatPercentDown } from '../utils/format'
@@ -8,16 +8,17 @@ import Modal from './ui/Modal'
 import Button from './ui/Button'
 import CategoryIcon from './CategoryIcon'
 
-const DEMO_TODAY = '2026-09-27'
+const getTodayIso = () => new Date().toISOString().split('T')[0]
 
-const EMPTY = {
+const getEmptyForm = () => ({
+  type: 'expense', // 'expense' or 'income'
   description: '',
   amount: '',
   category: 'Food',
-  date: DEMO_TODAY,
+  date: getTodayIso(),
   method: 'UPI',
   note: '',
-}
+})
 
 export default function AddExpenseModal({ open, onClose }) {
   const {
@@ -27,21 +28,23 @@ export default function AddExpenseModal({ open, onClose }) {
     totalExpenses,
     budgetTotal,
   } = useApp()
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(getEmptyForm)
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
     if (open) {
-      setForm(EMPTY)
+      setForm(getEmptyForm())
       setErrors({})
     }
   }, [open])
 
-  const row = categoryRows.find((item) => item.category === form.category)
+  const isExpense = form.type === 'expense'
+  const activeCategories = isExpense ? CATEGORIES : INCOME_CATEGORIES
+  const row = isExpense ? categoryRows.find((item) => item.category === form.category) : null
   const amount = Number(form.amount) || 0
 
   const preview = useMemo(() => {
-    if (!row) return null
+    if (!isExpense || !row) return null
     const nextSpent = row.spent + amount
     const percent = row.limit ? (nextSpent / row.limit) * 100 : 0
     return {
@@ -52,18 +55,26 @@ export default function AddExpenseModal({ open, onClose }) {
         ? ((totalExpenses + amount) / budgetTotal) * 100
         : 0,
     }
-  }, [row, amount, budgetTotal, totalExpenses])
+  }, [isExpense, row, amount, budgetTotal, totalExpenses])
 
   const update = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
     setErrors((prev) => ({ ...prev, [key]: undefined }))
   }
 
+  const setTransactionType = (nextType) => {
+    setForm((prev) => ({
+      ...prev,
+      type: nextType,
+      category: nextType === 'expense' ? 'Food' : 'Salary',
+    }))
+  }
+
   const validate = () => {
     const next = {}
     if (!form.description.trim()) next.description = 'Enter a description'
     if (!amount || amount <= 0) next.amount = 'Enter an amount above ₹1'
-    if (amount > 1000000) next.amount = 'Amount looks too large'
+    if (amount > 10000000) next.amount = 'Amount looks too large'
     if (!form.date) next.date = 'Pick a date'
     if (!form.method) next.method = 'Choose a payment method'
     setErrors(next)
@@ -74,21 +85,21 @@ export default function AddExpenseModal({ open, onClose }) {
     event.preventDefault()
     if (!validate()) return
 
+    const signedAmount = isExpense ? -Math.abs(amount) : Math.abs(amount)
+
     addTransaction({
       date: form.date,
       description: form.description.trim(),
       note: form.note.trim(),
       category: form.category,
       method: form.method,
-      amount: -Math.abs(amount),
+      amount: signedAmount,
     })
 
     pushToast({
-      title: 'Expense added',
-      body: `${form.description.trim()} · ${formatINR(amount, {
-        sign: true,
-      })} recorded under ${form.category}.`,
-      tone: 'emerald',
+      title: isExpense ? 'Expense added' : 'Income recorded! 💰',
+      body: `${form.description.trim()} · ${isExpense ? '-' : '+'}${formatINR(amount)} logged under ${form.category}.`,
+      tone: isExpense ? 'amber' : 'emerald',
     })
 
     onClose?.()
@@ -98,8 +109,8 @@ export default function AddExpenseModal({ open, onClose }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Add Expense"
-      description="Record a new spend and keep your September budget accurate."
+      title="Add Transaction"
+      description="Record a new expense or income credit to keep your ledger accurate."
       icon={Plus}
       size="lg"
       footer={
@@ -108,12 +119,37 @@ export default function AddExpenseModal({ open, onClose }) {
             Cancel
           </Button>
           <Button type="submit" form="add-expense-form">
-            Add Expense
+            {isExpense ? 'Add Expense' : 'Add Income (+)'}
           </Button>
         </>
       }
     >
       <form id="add-expense-form" onSubmit={submit} className="space-y-5">
+        {/* Type toggle: Expense vs Income */}
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+          <button
+            type="button"
+            onClick={() => setTransactionType('expense')}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2 text-[12.5px] font-semibold transition ${
+              isExpense
+                ? 'bg-white text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            <ArrowUpRight size={15} /> Expense (-)
+          </button>
+          <button
+            type="button"
+            onClick={() => setTransactionType('income')}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2 text-[12.5px] font-semibold transition ${
+              !isExpense
+                ? 'bg-white text-emerald-600 shadow-sm dark:bg-slate-900 dark:text-emerald-400'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            <ArrowDownLeft size={15} /> Income (+)
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="eyebrow mb-1.5 block" htmlFor="exp-description">
@@ -200,7 +236,7 @@ export default function AddExpenseModal({ open, onClose }) {
                 value={form.category}
                 onChange={(event) => update('category', event.target.value)}
               >
-                {CATEGORIES.map((category) => (
+                {activeCategories.map((category) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
@@ -240,70 +276,86 @@ export default function AddExpenseModal({ open, onClose }) {
             <input
               id="exp-note"
               className="input"
-              placeholder="What was this for?"
+              placeholder={isExpense ? "What was this for?" : "Payer / Client name, project details"}
               value={form.note}
               onChange={(event) => update('note', event.target.value)}
             />
           </div>
         </div>
 
-        {/* live budget preview */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-          <div className="flex items-center gap-3">
-            <CategoryIcon
-              category={form.category}
-              merchant={false}
-              description=""
-              size="sm"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="heading text-[13px] font-semibold">
-                {form.category} budget impact
-              </p>
-              <p className="muted text-[11px]">
-                {formatLongDate(form.date)} · {form.method}
-              </p>
+        {/* live budget / income preview */}
+        {isExpense ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="flex items-center gap-3">
+              <CategoryIcon
+                category={form.category}
+                merchant={false}
+                description=""
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="heading text-[13px] font-semibold">
+                  {form.category} budget impact
+                </p>
+                <p className="muted text-[11px]">
+                  {formatLongDate(form.date)} · {form.method}
+                </p>
+              </div>
+              {preview ? (
+                <span className={`badge ${preview.status.chip}`}>
+                  {Math.round(preview.percent)}% used
+                </span>
+              ) : null}
             </div>
+
             {preview ? (
-              <span className={`badge ${preview.status.chip}`}>
-                {Math.round(preview.percent)}% used
-              </span>
+              <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
+                  <p className="muted text-[10px] font-semibold uppercase tracking-wide">
+                    Category after
+                  </p>
+                  <p className="tabular heading mt-0.5 text-sm font-bold">
+                    {formatINR(preview.nextSpent)}
+                    <span className="muted text-[11px] font-medium">
+                      {' '}
+                      / {formatINR(row?.limit || 0)}
+                    </span>
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
+                  <p className="muted text-[10px] font-semibold uppercase tracking-wide">
+                    Monthly budget after
+                  </p>
+                  <p className="tabular heading mt-0.5 text-sm font-bold">
+                    {formatPercentDown(preview.overall)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
+                  <p className="muted text-[10px] font-semibold uppercase tracking-wide">
+                    Status
+                  </p>
+                  <p className="heading mt-0.5 text-sm font-bold">
+                    {preview.status.label}
+                  </p>
+                </div>
+              </div>
             ) : null}
           </div>
-
-          {preview ? (
-            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-              <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
-                <p className="muted text-[10px] font-semibold uppercase tracking-wide">
-                  Category after
-                </p>
-                <p className="tabular heading mt-0.5 text-sm font-bold">
-                  {formatINR(preview.nextSpent)}
-                  <span className="muted text-[11px] font-medium">
-                    {' '}
-                    / {formatINR(row?.limit || 0)}
-                  </span>
-                </p>
-              </div>
-              <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
-                <p className="muted text-[10px] font-semibold uppercase tracking-wide">
-                  Monthly budget after
-                </p>
-                <p className="tabular heading mt-0.5 text-sm font-bold">
-                  {formatPercentDown(preview.overall)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-white p-3 dark:bg-slate-900">
-                <p className="muted text-[10px] font-semibold uppercase tracking-wide">
-                  Status
-                </p>
-                <p className="heading mt-0.5 text-sm font-bold">
-                  {preview.status.label}
-                </p>
-              </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="heading text-[13px] font-semibold text-emerald-900 dark:text-emerald-300">
+                Positive Cash Inflow (+{formatINR(amount || 0)})
+              </p>
+              <p className="muted text-[11px] leading-snug">
+                This will be credited to your ledger on {formatLongDate(form.date)}, increasing your live Total Balance and monthly Net Savings.
+              </p>
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
 
         <p className="flex items-start gap-2 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
           <Wallet size={13} className="mt-px shrink-0" />

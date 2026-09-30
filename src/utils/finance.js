@@ -39,7 +39,16 @@ export function clamp(value, min = 0, max = 100) {
  * Health of a spending category.
  * < 70 normal · 70-85 warning · >= 85 near limit
  */
-export function budgetStatus(usedPercent) {
+export function budgetStatus(usedPercent, budgetTotal = 0) {
+  if (budgetTotal <= 0) {
+    return {
+      key: 'unset',
+      label: 'No budget set',
+      tone: 'slate',
+      bar: 'bg-slate-300 dark:bg-slate-700',
+      chip: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    }
+  }
   if (usedPercent >= 100)
     return {
       key: 'over',
@@ -74,20 +83,29 @@ export function budgetStatus(usedPercent) {
 }
 
 /**
- * Composite 0-100 financial score — the average of four health pillars:
- *   1. Savings discipline  → savings rate against a 40% ideal
- *   2. Budget control      → headroom left in the monthly envelope
- *   3. Debt management     → debt-to-income against a 0% ideal
- *   4. Emergency buffer    → emergency fund against 3x monthly spend
- * With the seeded September data this lands on 82 / 100 ("Good").
+ * Composite 0-100 financial score — the average of four health pillars.
+ * Returns 0 if the user has not recorded any transactions or income yet.
  */
 export function financialScore({
-  savingsRate,
-  budgetUsage,
-  debtToIncome,
-  monthlyExpenses,
-  emergencyFund,
+  savingsRate = 0,
+  budgetUsage = 0,
+  debtToIncome = 0,
+  monthlyExpenses = 0,
+  emergencyFund = 0,
+  hasTransactions = false,
 }) {
+  if (!hasTransactions && monthlyExpenses === 0 && savingsRate === 0 && emergencyFund === 0) {
+    return {
+      total: 0,
+      pillars: [
+        { key: 'savings', label: 'Savings discipline', value: 0 },
+        { key: 'budget', label: 'Budget control', value: 0 },
+        { key: 'debt', label: 'Debt management', value: 0 },
+        { key: 'emergency', label: 'Emergency buffer', value: 0 },
+      ],
+    }
+  }
+
   const savings = clamp((savingsRate / 40) * 100)
   const budget = clamp(164 - budgetUsage)
   const debt = clamp(100 - debtToIncome)
@@ -107,6 +125,7 @@ export function financialScore({
 }
 
 export function scoreLabel(score) {
+  if (!score || score <= 0) return { label: 'No data', tone: 'slate' }
   if (score >= 85) return { label: 'Excellent', tone: 'emerald' }
   if (score >= 75) return { label: 'Good', tone: 'emerald' }
   if (score >= 60) return { label: 'Fair', tone: 'amber' }

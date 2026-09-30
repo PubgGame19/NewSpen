@@ -94,7 +94,7 @@ export default function Insights() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="emerald" icon={Sparkles}>
-            {INSIGHTS.length} insights this month
+            {INSIGHTS.length} insights
           </Badge>
           <Button
             variant="ghost"
@@ -111,8 +111,8 @@ export default function Insights() {
         <StatCard
           label="Savings Rate"
           value={formatPercent(savingsRate)}
-          delta={6.1}
-          deltaLabel="vs August (30.2%)"
+          delta={0}
+          deltaLabel="vs last month"
           icon={PiggyBank}
           tone="emerald"
           spark={savingsGrowth.map((row) => row.saved)}
@@ -122,7 +122,7 @@ export default function Insights() {
           value={formatINR(
             Math.round(
               monthlySeries.reduce((sum, row) => sum + row.expenses, 0) /
-                monthlySeries.length,
+                (monthlySeries.length || 1),
             ),
           )}
           deltaLabel="6-month average"
@@ -154,18 +154,26 @@ export default function Insights() {
           subtitle="Generated from this month's transactions and budgets."
           className="mb-4"
         />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {INSIGHTS.map((insight) => (
-            <InsightCard
-              key={insight.id}
-              icon={insight.icon}
-              tone={insight.tone}
-              tag={insight.tag}
-              title={insight.title}
-              body={insight.body}
-            />
-          ))}
-        </div>
+        {INSIGHTS.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {INSIGHTS.map((insight) => (
+              <InsightCard
+                key={insight.id}
+                icon={insight.icon}
+                tone={insight.tone}
+                tag={insight.tag}
+                title={insight.title}
+                body={insight.body}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="py-10 text-center animate-rise">
+            <Sparkles size={28} className="mx-auto text-emerald-500/60" />
+            <p className="heading mt-3 text-sm font-semibold">No insights generated yet</p>
+            <p className="muted mt-1 text-xs">Add your income and expense transactions to unlock real-time financial intelligence.</p>
+          </Card>
+        )}
       </section>
 
       {/* ---------------------------------------------------- charts row 1 */}
@@ -182,7 +190,7 @@ export default function Insights() {
           ]}
           action={
             <Badge tone="emerald" icon={TrendingUp}>
-              {formatPercent(ratioPercent(totalIncome - 38000, 38000))} income growth
+              6-month trend
             </Badge>
           }
         >
@@ -480,36 +488,40 @@ export default function Insights() {
           />
 
           <div className="mt-5 space-y-5">
-            {loans.map((loan) => {
-              const repaid = 100 - ratioPercent(loan.outstanding, loan.originalAmount)
-              return (
-                <div key={loan.id}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="heading text-[13px] font-semibold">{loan.name}</p>
-                    <p className="tabular heading text-[13px] font-bold">
-                      {formatINR(loan.outstanding)}
-                    </p>
+            {loans.length > 0 ? (
+              loans.map((loan) => {
+                const repaid = 100 - ratioPercent(loan.outstanding, loan.originalAmount)
+                return (
+                  <div key={loan.id}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="heading text-[13px] font-semibold">{loan.name}</p>
+                      <p className="tabular heading text-[13px] font-bold">
+                        {formatINR(loan.outstanding)}
+                      </p>
+                    </div>
+                    <ProgressBar
+                      value={repaid}
+                      bar={loan.interestRate > 10 ? 'bg-amber-500' : 'bg-emerald-500'}
+                      height="h-2"
+                      className="mt-2"
+                    />
+                    <div className="muted mt-1.5 flex justify-between text-[11px] font-medium">
+                      <span>{Math.round(repaid)}% repaid</span>
+                      <span>EMI {formatINR(loan.emi)}</span>
+                    </div>
                   </div>
-                  <ProgressBar
-                    value={repaid}
-                    bar={loan.interestRate > 10 ? 'bg-amber-500' : 'bg-emerald-500'}
-                    height="h-2"
-                    className="mt-2"
-                  />
-                  <div className="muted mt-1.5 flex justify-between text-[11px] font-medium">
-                    <span>{Math.round(repaid)}% repaid</span>
-                    <span>EMI {formatINR(loan.emi)}</span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })
+            ) : (
+              <p className="muted py-4 text-center text-xs">No active loans found.</p>
+            )}
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             {[
               { label: 'Monthly EMI', value: formatINR(emiTotal) },
               { label: 'Budget used', value: formatPercentDown(budgetUsagePercent) },
-              { label: 'Next due', value: formatMediumDate('2026-10-05') },
+              { label: 'Next due', value: loans[0]?.nextPaymentDate ? formatMediumDate(loans[0].nextPaymentDate) : '—' },
               { label: 'Savings rate', value: formatPercent(savingsRate) },
             ].map((item) => (
               <div key={item.label}>
@@ -540,7 +552,7 @@ export default function Insights() {
         <div className="px-5 pt-5 sm:px-6">
           <CardHeader
             title="Category performance"
-            subtitle="This month against August, with budget utilisation"
+            subtitle="Current spending with budget utilisation"
             action={<Wallet size={18} className="text-slate-400" />}
           />
         </div>
@@ -549,8 +561,8 @@ export default function Insights() {
             <thead className="border-y border-slate-100 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30">
               <tr className="muted text-[11px] font-semibold uppercase tracking-wide">
                 <th className="px-5 py-3">Category</th>
-                <th className="px-5 py-3">September</th>
-                <th className="px-5 py-3">August</th>
+                <th className="px-5 py-3">Spent</th>
+                <th className="px-5 py-3">Last Month</th>
                 <th className="px-5 py-3">Change</th>
                 <th className="px-5 py-3">Budget used</th>
                 <th className="px-5 py-3 text-right">Share</th>

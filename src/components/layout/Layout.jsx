@@ -6,11 +6,22 @@ import Header from './Header'
 import MobileNav from './MobileNav'
 import Sidebar from './Sidebar'
 import AddExpenseModal from '../AddExpenseModal'
+import RecurringManagerModal from '../RecurringManagerModal'
 import Logo from '../ui/Logo'
 import Toaster from '../ui/Toaster'
 
 export default function Layout() {
-  const { quickAddOpen, closeQuickAdd } = useApp()
+  const {
+    quickAddOpen,
+    closeQuickAdd,
+    recurringModalOpen,
+    closeRecurringModal,
+    recurringRules,
+    addRecurring,
+    updateRecurring,
+    deleteRecurring,
+    processDueRecurringManually,
+  } = useApp()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const location = useLocation()
 
@@ -44,18 +55,31 @@ export default function Layout() {
           </div>
         </main>
 
-        <footer className="hidden items-center gap-2.5 border-t border-slate-200 px-8 py-4 text-[11px] font-medium text-slate-400 lg:flex dark:border-slate-800">
-          <Logo className="h-6 w-6 opacity-80" alt="" />
-          <span>
-            SPENANCE · Personal Finance &amp; Loan Management System · Demo
-            prototype with fictional data (September 2026). No real accounts,
-            payments or AI services are connected.
+        <footer className="hidden items-center justify-between border-t border-slate-200 px-8 py-4 text-[11px] font-medium text-slate-400 lg:flex dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <Logo className="h-5 w-5 opacity-80" alt="" />
+            <span>
+              © {new Date().getFullYear()} SPENANCE · Personal Finance &amp; Loan Management System · All rights reserved.
+            </span>
+          </div>
+          <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Cloud Synced
           </span>
         </footer>
       </div>
 
       <MobileNav />
       <AddExpenseModal open={quickAddOpen} onClose={closeQuickAdd} />
+      <RecurringManagerModal
+        isOpen={recurringModalOpen}
+        onClose={closeRecurringModal}
+        recurringRules={recurringRules}
+        onAddRule={addRecurring}
+        onUpdateRule={updateRecurring}
+        onDeleteRule={deleteRecurring}
+        onProcessDue={processDueRecurringManually}
+      />
       <Toaster />
     </div>
   )

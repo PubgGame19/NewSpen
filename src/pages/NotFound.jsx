@@ -14,11 +14,11 @@ export default function NotFound() {
       <div>
         <p className="eyebrow">Error 404</p>
         <h2 className="heading mt-1 text-lg font-bold">
-          This page isn't part of the demo
+          Page Not Found
         </h2>
         <p className="muted mx-auto mt-2 max-w-sm text-[13px] leading-snug">
-          The route you opened does not exist in SPENANCE. Jump back to the
-          dashboard to continue the walkthrough.
+          The requested page does not exist or has been moved. Jump back to the
+          dashboard to continue managing your finances.
         </p>
       </div>
       <Button icon={Home} onClick={() => navigate('/')}>

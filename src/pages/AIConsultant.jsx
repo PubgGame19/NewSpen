@@ -6,13 +6,15 @@ import {
   CreditCard,
   Gauge,
   Info,
+  KeyRound,
   Landmark,
   PiggyBank,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { AI_GREETING, AI_INSIGHT_CARDS, UPCOMING_PAYMENTS } from '../data/mockData'
+import { AI_GREETING, AI_INSIGHT_CARDS } from '../data/mockData'
+import { isGeminiConfigured } from '../services/geminiService'
 import {
   formatINR,
   formatLongDate,
@@ -38,6 +40,7 @@ export default function AIConsultant() {
     scoreLabel,
     emiTotal,
     period,
+    loans,
   } = useApp()
   const navigate = useNavigate()
 
@@ -94,9 +97,19 @@ export default function AIConsultant() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="emerald" icon={ShieldCheck}>
-            Demo mode · no external AI
-          </Badge>
+          {isGeminiConfigured() ? (
+            <Badge tone="emerald" icon={Sparkles}>
+              Gemini 1.5 Pro Active
+            </Badge>
+          ) : (
+            <Button
+              variant="outline"
+              icon={KeyRound}
+              onClick={() => navigate('/settings')}
+            >
+              Connect Gemini Pro
+            </Button>
+          )}
           <Button
             variant="ghost"
             icon={CreditCard}
@@ -125,31 +138,35 @@ export default function AIConsultant() {
             </span>
             <span className="muted flex items-center gap-2">
               <Info size={14} />
-              Largest category: {largestCategory?.category} (
+              Largest category: {largestCategory?.category || 'None'} (
               {formatINR(largestCategory?.spent || 0)})
             </span>
             <span className="muted flex items-center gap-2">
               <Landmark size={14} />
-              EMIs: {formatINR(emiTotal)} · Next{' '}
-              {formatLongDate(UPCOMING_PAYMENTS[0].dueDate)}
+              EMIs: {formatINR(emiTotal)}
+              {loans && loans.length > 0 && loans[0]?.nextPaymentDate ? (
+                <> · Next {formatLongDate(loans[0].nextPaymentDate)}</>
+              ) : null}
             </span>
           </div>
         </div>
       </Card>
 
       {/* -------------------------------------------------- insight cards */}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {AI_INSIGHT_CARDS.map((card) => (
-          <InsightCard
-            key={card.id}
-            icon={card.icon}
-            tone={card.tone}
-            tag="Detected"
-            title={card.title}
-            body={card.body}
-          />
-        ))}
-      </section>
+      {AI_INSIGHT_CARDS.length > 0 && (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {AI_INSIGHT_CARDS.map((card) => (
+            <InsightCard
+              key={card.id}
+              icon={card.icon}
+              tone={card.tone}
+              tag="Detected"
+              title={card.title}
+              body={card.body}
+            />
+          ))}
+        </section>
+      )}
 
       {/* --------------------------------------------------- chat + panel */}
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -223,11 +240,9 @@ export default function AIConsultant() {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-950/40">
-              <p className="muted text-[11px] leading-snug">
-                <strong className="heading">Demo note:</strong> SPENANCE AI uses a
-                predefined knowledge base and your local demo data. No external
-                AI service, API key or internet call is involved.
+            <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5">
+              <p className="muted text-[11.5px] leading-snug">
+                <strong className="heading text-emerald-600 dark:text-emerald-400">Financial Advisory Note:</strong> Recommendations are calculated dynamically using your personal budget allocations, transactions and cash flow patterns.
               </p>
             </div>
           </Card>

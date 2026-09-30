@@ -26,7 +26,7 @@ function initialsOf(name) {
   const parts = String(name || '')
     .split(/[\s._-]+/)
     .filter(Boolean)
-  if (!parts.length) return 'RS'
+  if (!parts.length) return 'U'
   return parts
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())

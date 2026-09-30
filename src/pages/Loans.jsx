@@ -47,6 +47,7 @@ const PRESETS = [
 ]
 
 function buildBalanceCurve(amount, rate, years, emi) {
+  if (!amount || !rate || !years || !emi) return []
   const monthlyRate = rate / 12 / 100
   let balance = amount
   const points = []
@@ -72,9 +73,9 @@ export default function Loans() {
   const [addOpen, setAddOpen] = useState(false)
   const [prefill, setPrefill] = useState(null)
 
-  const [amount, setAmount] = useState(500000)
-  const [rate, setRate] = useState(8.5)
-  const [years, setYears] = useState(5)
+  const [amount, setAmount] = useState(0)
+  const [rate, setRate] = useState(0)
+  const [years, setYears] = useState(0)
 
   /* always read the live record so pay/remove actions refresh the dialog */
   const selected = loans.find((loan) => loan.id === selectedId) || null
@@ -142,17 +143,29 @@ export default function Loans() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="emerald">On-time payer</Badge>
+          {loans.length > 0 ? (
+            <Badge tone="emerald">On-time payer</Badge>
+          ) : (
+            <Badge tone="slate">No active loans</Badge>
+          )}
           <Button
             variant="ghost"
             icon={Receipt}
-            onClick={() =>
+            onClick={() => {
+              if (loans.length === 0) {
+                pushToast({
+                  title: 'No loans tracked',
+                  body: 'Add your first loan to generate repayment reports.',
+                  tone: 'sky',
+                })
+                return
+              }
               pushToast({
                 title: 'Repayment report generated',
-                body: `A demo summary of your ${loans.length} loans is ready in your downloads.`,
-                tone: 'sky',
+                body: `A summary of your ${loans.length} active loans has been exported.`,
+                tone: 'emerald',
               })
-            }
+            }}
           >
             Repayment report
           </Button>

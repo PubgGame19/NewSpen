@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Receipt, Trash2 } from 'lucide-react'
 import { CATEGORY_META } from '../data/mockData'
 import CategoryIcon from './CategoryIcon'
 import { formatINR, formatShortDate } from '../utils/format'
@@ -67,7 +67,20 @@ export default function TransactionList({
   onDelete,
   showCategory = true,
   className = '',
+  emptyMessage = 'No transactions recorded yet',
 }) {
+  if (!items.length) {
+    return (
+      <div className={`py-12 text-center ${className}`}>
+        <Receipt size={32} className="mx-auto text-slate-300 dark:text-slate-600" />
+        <p className="heading mt-2 text-sm font-semibold">{emptyMessage}</p>
+        <p className="muted mt-1 text-xs">
+          Click "+ Add Expense" to record your first transaction.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <ul className={`divide-row ${className}`}>
       {items.map((txn) => (

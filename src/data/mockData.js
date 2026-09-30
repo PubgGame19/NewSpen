@@ -1,26 +1,28 @@
 /**
  * ------------------------------------------------------------------
- *  SPENANCE — demo dataset
- *  Fictional user + fictional transactions (September / October 2026).
- *  Every figure is internally consistent with the September 2026 view:
- *    income ₹45,000 · expenses ₹28,650 · savings ₹16,350 (36.3%)
- *    budget ₹35,000 (81.8% used) · debt-to-income 24% · score 82/100
+ *  SPENANCE — Schema & Constants
+ *  Clean production template: All mock transactions, loans, and
+ *  fictional user artifacts have been cleared for real user data.
  * ------------------------------------------------------------------
  */
 
 export const DEMO_USER = {
-  name: 'Rahul Sharma',
-  firstName: 'Rahul',
-  initials: 'RS',
-  email: 'rahul.sharma@example.com',
-  phone: '+91 98•••••210',
+  name: 'User',
+  firstName: 'User',
+  initials: 'U',
+  email: '',
+  phone: '',
   accountType: 'Personal Account',
-  memberSince: 'January 2024',
-  monthlyIncome: 45000,
-  emergencyFund: 68000,
-  debtToIncome: 24,
+  memberSince: new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }),
+  openingBalance: 0,
+  monthlyIncome: 0,
+  emergencyFund: 0,
+  debtToIncome: 0,
   currency: 'INR',
-  city: 'Bengaluru, India',
+  city: '',
   notifications: {
     budgetAlerts: true,
     loanReminders: true,
@@ -28,7 +30,10 @@ export const DEMO_USER = {
   },
 }
 
-export const DEMO_MONTH = 'September 2026'
+export const DEMO_MONTH = new Date().toLocaleDateString('en-US', {
+  month: 'long',
+  year: 'numeric',
+})
 
 /* ------------------------------------------------------------------ */
 /* Categories                                                          */
@@ -43,7 +48,17 @@ export const CATEGORIES = [
   'Other',
 ]
 
-export const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card']
+export const INCOME_CATEGORIES = [
+  'Salary',
+  'Freelance',
+  'Investment',
+  'Bonus',
+  'Rental',
+  'Refund',
+  'Other Income',
+]
+
+export const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking']
 
 export const CATEGORY_META = {
   Food: {
@@ -102,313 +117,98 @@ export const CATEGORY_META = {
     bar: 'bg-emerald-500',
     soft: 'bg-emerald-50 dark:bg-emerald-500/10',
   },
+  Salary: {
+    color: '#14b8a6',
+    icon: 'Banknote',
+    chip: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300',
+    dot: 'bg-teal-500',
+    bar: 'bg-teal-500',
+    soft: 'bg-teal-50 dark:bg-teal-500/10',
+  },
+  Investment: {
+    color: '#8b5cf6',
+    icon: 'TrendingUp',
+    chip: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
+    dot: 'bg-violet-500',
+    bar: 'bg-violet-500',
+    soft: 'bg-violet-50 dark:bg-violet-500/10',
+  },
+  Refund: {
+    color: '#06b6d4',
+    icon: 'RotateCcw',
+    chip: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
+    dot: 'bg-cyan-500',
+    bar: 'bg-cyan-500',
+    soft: 'bg-cyan-50 dark:bg-cyan-500/10',
+  },
 }
 
 /* ------------------------------------------------------------------ */
-/* Transactions — 24 expenses (₹28,650) + 1 salary credit (₹45,000)   */
+/* Transactions — Clean empty set for real user data                   */
 /* ------------------------------------------------------------------ */
 
-export const INITIAL_TRANSACTIONS = [
-  // ---- Food · ₹6,200 -------------------------------------------------
-  {
-    id: 'txn-01',
-    date: '2026-09-26',
-    description: 'Swiggy',
-    note: 'Dinner order',
-    category: 'Food',
-    method: 'UPI',
-    amount: -420,
-  },
-  {
-    id: 'txn-02',
-    date: '2026-09-25',
-    description: 'Reliance Smart',
-    note: 'Monthly groceries',
-    category: 'Food',
-    method: 'Debit Card',
-    amount: -2350,
-  },
-  {
-    id: 'txn-03',
-    date: '2026-09-20',
-    description: 'Zomato',
-    note: 'Lunch with friends',
-    category: 'Food',
-    method: 'UPI',
-    amount: -380,
-  },
-  {
-    id: 'txn-04',
-    date: '2026-09-14',
-    description: 'BigBasket',
-    note: 'Groceries',
-    category: 'Food',
-    method: 'UPI',
-    amount: -1650,
-  },
-  {
-    id: 'txn-05',
-    date: '2026-09-03',
-    description: 'Zomato',
-    note: 'Weekend order',
-    category: 'Food',
-    method: 'Credit Card',
-    amount: -1400,
-  },
-
-  // ---- Transport · ₹3,400 -------------------------------------------
-  {
-    id: 'txn-06',
-    date: '2026-09-24',
-    description: 'Uber',
-    note: 'Office commute',
-    category: 'Transport',
-    method: 'UPI',
-    amount: -280,
-  },
-  {
-    id: 'txn-07',
-    date: '2026-09-21',
-    description: 'Ola Cabs',
-    note: 'Airport drop',
-    category: 'Transport',
-    method: 'UPI',
-    amount: -340,
-  },
-  {
-    id: 'txn-08',
-    date: '2026-09-17',
-    description: 'Indian Oil',
-    note: 'Fuel top-up',
-    category: 'Transport',
-    method: 'Debit Card',
-    amount: -1200,
-  },
-  {
-    id: 'txn-09',
-    date: '2026-09-11',
-    description: 'Metro Card',
-    note: 'Travel recharge',
-    category: 'Transport',
-    method: 'UPI',
-    amount: -500,
-  },
-  {
-    id: 'txn-10',
-    date: '2026-09-02',
-    description: 'Rapido',
-    note: 'Bike taxi',
-    category: 'Transport',
-    method: 'UPI',
-    amount: -1080,
-  },
-
-  // ---- Shopping · ₹4,800 --------------------------------------------
-  {
-    id: 'txn-11',
-    date: '2026-09-22',
-    description: 'Amazon',
-    note: 'Wireless headphones',
-    category: 'Shopping',
-    method: 'Credit Card',
-    amount: -2499,
-  },
-  {
-    id: 'txn-12',
-    date: '2026-09-18',
-    description: 'Myntra',
-    note: 'Kurta set',
-    category: 'Shopping',
-    method: 'Credit Card',
-    amount: -1299,
-  },
-  {
-    id: 'txn-13',
-    date: '2026-09-09',
-    description: 'Flipkart',
-    note: 'Phone cover & cable',
-    category: 'Shopping',
-    method: 'UPI',
-    amount: -602,
-  },
-  {
-    id: 'txn-14',
-    date: '2026-09-06',
-    description: 'Decathlon',
-    note: 'Running socks',
-    category: 'Shopping',
-    method: 'Debit Card',
-    amount: -400,
-  },
-
-  // ---- Bills · ₹7,250 ------------------------------------------------
-  {
-    id: 'txn-15',
-    date: '2026-09-23',
-    description: 'Electricity Bill',
-    note: 'BESCOM',
-    category: 'Bills',
-    method: 'UPI',
-    amount: -1850,
-  },
-  {
-    id: 'txn-16',
-    date: '2026-09-19',
-    description: 'Airtel Postpaid',
-    note: 'Mobile bill',
-    category: 'Bills',
-    method: 'UPI',
-    amount: -799,
-  },
-  {
-    id: 'txn-17',
-    date: '2026-09-15',
-    description: 'WiFi Broadband',
-    note: 'Fiber plan',
-    category: 'Bills',
-    method: 'Debit Card',
-    amount: -999,
-  },
-  {
-    id: 'txn-18',
-    date: '2026-09-10',
-    description: 'LPG Cylinder',
-    note: 'Kitchen gas',
-    category: 'Bills',
-    method: 'Cash',
-    amount: -1300,
-  },
-  {
-    id: 'txn-19',
-    date: '2026-09-01',
-    description: 'House Rent Share',
-    note: 'Shared flat',
-    category: 'Bills',
-    method: 'UPI',
-    amount: -2302,
-  },
-
-  // ---- Entertainment · ₹1,500 ----------------------------------------
-  {
-    id: 'txn-20',
-    date: '2026-09-21',
-    description: 'Netflix',
-    note: 'Subscription',
-    category: 'Entertainment',
-    method: 'Credit Card',
-    amount: -649,
-  },
-  {
-    id: 'txn-21',
-    date: '2026-09-16',
-    description: 'BookMyShow',
-    note: 'Movie tickets',
-    category: 'Entertainment',
-    method: 'UPI',
-    amount: -551,
-  },
-  {
-    id: 'txn-22',
-    date: '2026-09-07',
-    description: 'Spotify',
-    note: 'Premium plan',
-    category: 'Entertainment',
-    method: 'UPI',
-    amount: -300,
-  },
-
-  // ---- Other · ₹5,500 -------------------------------------------------
-  {
-    id: 'txn-23',
-    date: '2026-09-25',
-    description: 'College Fees',
-    note: 'Semester fee',
-    category: 'Other',
-    method: 'UPI',
-    amount: -4500,
-  },
-  {
-    id: 'txn-24',
-    date: '2026-09-06',
-    description: 'Cult.fit',
-    note: 'Gym membership',
-    category: 'Other',
-    method: 'Debit Card',
-    amount: -1000,
-  },
-
-  // ---- Income ---------------------------------------------------------
-  {
-    id: 'txn-25',
-    date: '2026-09-01',
-    description: 'Salary',
-    note: 'September payroll',
-    category: 'Income',
-    method: 'Bank Transfer',
-    amount: 45000,
-  },
-]
+export const INITIAL_TRANSACTIONS = []
 
 /* ------------------------------------------------------------------ */
 /* Budgets                                                             */
 /* ------------------------------------------------------------------ */
 
-/** Sum = ₹35,000 monthly budget */
 export const DEFAULT_BUDGETS = {
-  Food: 8000,
-  Transport: 5000,
-  Shopping: 5000,
-  Bills: 8000,
-  Entertainment: 3000,
-  Other: 6000,
+  Food: 0,
+  Transport: 0,
+  Shopping: 0,
+  Bills: 0,
+  Entertainment: 0,
+  Other: 0,
 }
 
 /* ------------------------------------------------------------------ */
-/* 6-month history (Apr – Sep 2026)                                    */
+/* 6-month history                                                    */
 /* ------------------------------------------------------------------ */
 
-export const MONTHLY_HISTORY = [
-  { month: 'April', short: 'Apr', income: 38000, expenses: 25000 },
-  { month: 'May', short: 'May', income: 40000, expenses: 27000 },
-  { month: 'June', short: 'Jun', income: 42000, expenses: 29000 },
-  { month: 'July', short: 'Jul', income: 44000, expenses: 26000 },
-  { month: 'August', short: 'Aug', income: 43000, expenses: 30000 },
-  { month: 'September', short: 'Sep', income: 45000, expenses: 28650 },
-].map((m) => ({ ...m, savings: m.income - m.expenses }))
+export const MONTHLY_HISTORY = (() => {
+  const months = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const month = d.toLocaleDateString('en-US', { month: 'long' })
+    const short = d.toLocaleDateString('en-US', { month: 'short' })
+    months.push({ month, short, income: 0, expenses: 0, savings: 0 })
+  }
+  return months
+})()
 
-/** Closing balance by month — Aug 48,475 → Sep 52,450 is the +8.2% move */
-export const BALANCE_TREND = [
-  { month: 'Apr', value: 31200 },
-  { month: 'May', value: 36400 },
-  { month: 'Jun', value: 40900 },
-  { month: 'Jul', value: 47700 },
-  { month: 'Aug', value: 48475 },
-  { month: 'Sep', value: 52450 },
-]
+export const BALANCE_TREND = (() => {
+  const trend = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const month = d.toLocaleDateString('en-US', { month: 'short' })
+    trend.push({ month, value: 0 })
+  }
+  return trend
+})()
 
-/** Last month's spend per category — drives the "vs last month" deltas */
 export const LAST_MONTH_CATEGORIES = {
-  Food: 5250,
-  Transport: 3600,
-  Shopping: 4300,
-  Bills: 7800,
-  Entertainment: 2900,
-  Other: 6150,
+  Food: 0,
+  Transport: 0,
+  Shopping: 0,
+  Bills: 0,
+  Entertainment: 0,
+  Other: 0,
 }
 
-/** Month-over-month badges shown on the dashboard stat cards */
 export const STAT_DELTAS = {
-  balance: { value: 8.2, direction: 'up', label: 'from last month' },
-  income: { value: 4.7, direction: 'up', label: 'This month' },
-  expenses: { value: -4.5, direction: 'down', label: 'from last month' },
-  savings: { value: 12.4, direction: 'up', label: 'from last month' },
+  balance: { value: 0, direction: 'neutral', label: 'vs last month' },
+  income: { value: 0, direction: 'neutral', label: 'This month' },
+  expenses: { value: 0, direction: 'neutral', label: 'vs last month' },
+  savings: { value: 0, direction: 'neutral', label: 'vs last month' },
 }
 
 /* ------------------------------------------------------------------ */
 /* Loans                                                              */
 /* ------------------------------------------------------------------ */
 
-/** Options offered when adding a loan */
 export const LOAN_TYPES = [
   'Education',
   'Personal',
@@ -420,242 +220,54 @@ export const LOAN_TYPES = [
   'Other',
 ]
 
-export const LOANS = [
-  {
-    id: 'loan-edu',
-    name: 'Education Loan',
-    lender: 'State Bank of India',
-    type: 'Education',
-    accountNumber: '•••• 4821',
-    originalAmount: 500000,
-    outstanding: 425000,
-    interestRate: 8.5,
-    emi: 8500,
-    tenureMonths: 60,
-    paidMonths: 9,
-    startDate: '2026-01-05',
-    nextPaymentDate: '2026-10-05',
-    status: 'Active',
-    coApplicant: 'Suresh Sharma (Father)',
-    purpose: 'Post-graduation programme fee',
-    moratorium: 'Ends 31 Dec 2026',
-  },
-  {
-    id: 'loan-personal',
-    name: 'Personal Loan',
-    lender: 'HDFC Bank',
-    type: 'Personal',
-    accountNumber: '•••• 7390',
-    originalAmount: 120000,
-    outstanding: 72000,
-    interestRate: 11.5,
-    emi: 4200,
-    tenureMonths: 36,
-    paidMonths: 24,
-    startDate: '2024-10-12',
-    nextPaymentDate: '2026-10-12',
-    status: 'Active',
-    coApplicant: '—',
-    purpose: 'Laptop upgrade & emergency buffer',
-    moratorium: 'Not applicable',
-  },
-]
+export const LOANS = []
 
 /* ------------------------------------------------------------------ */
-/* Upcoming payments (October 2026)                                   */
+/* Upcoming payments                                                  */
 /* ------------------------------------------------------------------ */
 
-export const UPCOMING_PAYMENTS = [
-  {
-    id: 'up-1',
-    title: 'Education Loan',
-    meta: 'SBI · EMI',
-    amount: 8500,
-    dueDate: '2026-10-05',
-    kind: 'loan',
-    autoDebit: true,
-  },
-  {
-    id: 'up-2',
-    title: 'Electricity Bill',
-    meta: 'BESCOM · Recurring',
-    amount: 1850,
-    dueDate: '2026-10-08',
-    kind: 'bill',
-    autoDebit: false,
-  },
-  {
-    id: 'up-3',
-    title: 'Netflix',
-    meta: 'Subscription · Auto-pay',
-    amount: 649,
-    dueDate: '2026-10-10',
-    kind: 'subscription',
-    autoDebit: true,
-  },
-  {
-    id: 'up-4',
-    title: 'Personal Loan',
-    meta: 'HDFC · EMI',
-    amount: 4200,
-    dueDate: '2026-10-12',
-    kind: 'loan',
-    autoDebit: true,
-  },
-]
+export const UPCOMING_PAYMENTS = []
 
 /* ------------------------------------------------------------------ */
 /* Notifications                                                      */
 /* ------------------------------------------------------------------ */
 
-export const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'ntf-1',
-    title: 'Education loan EMI due soon',
-    body: '₹8,500 is scheduled for auto-debit on 05 October 2026.',
-    time: '2 hours ago',
-    tone: 'amber',
-    unread: true,
-    to: '/loans',
-  },
-  {
-    id: 'ntf-2',
-    title: 'Shopping budget is at 96%',
-    body: 'You have ₹200 left in the Shopping envelope for September.',
-    time: '6 hours ago',
-    tone: 'rose',
-    unread: true,
-    to: '/budget',
-  },
-  {
-    id: 'ntf-3',
-    title: 'Salary credited',
-    body: '₹45,000 received from September payroll.',
-    time: 'Yesterday',
-    tone: 'emerald',
-    unread: true,
-    to: '/expenses',
-  },
-  {
-    id: 'ntf-4',
-    title: 'New insight available',
-    body: 'Food spending is 18% higher than last month.',
-    time: '2 days ago',
-    tone: 'sky',
-    unread: false,
-    to: '/insights',
-  },
-]
+export const INITIAL_NOTIFICATIONS = []
 
 /* ------------------------------------------------------------------ */
 /* Insights                                                           */
 /* ------------------------------------------------------------------ */
 
-export const INSIGHTS = [
-  {
-    id: 'ins-1',
-    icon: 'TrendingUp',
-    tone: 'emerald',
-    tag: 'Savings',
-    title: 'Your savings increased by 12.4% this month.',
-    body: 'You set aside ₹16,350 in September — your savings rate is now 36.3% of income.',
-  },
-  {
-    id: 'ins-2',
-    icon: 'AlertTriangle',
-    tone: 'amber',
-    tag: 'Food',
-    title: 'Food spending is 18% higher than last month.',
-    body: 'Groceries and food delivery added up to ₹6,200 vs ₹5,250 in August.',
-  },
-  {
-    id: 'ins-3',
-    icon: 'Gauge',
-    tone: 'sky',
-    tag: 'Budget',
-    title: 'You are currently using 81.8% of your monthly budget.',
-    body: '₹6,350 is still available out of your ₹35,000 September envelope.',
-  },
-  {
-    id: 'ins-4',
-    icon: 'Lightbulb',
-    tone: 'violet',
-    tag: 'Opportunity',
-    title: 'Reducing entertainment spending by ₹500 could increase your monthly savings.',
-    body: 'Trimming one streaming plan and one night out keeps you on the same lifestyle.',
-  },
-  {
-    id: 'ins-5',
-    icon: 'PiggyBank',
-    tone: 'emerald',
-    tag: 'Health',
-    title: 'Your current savings rate is 36.3%.',
-    body: 'Financial planners usually recommend a 30% floor — you are comfortably above it.',
-  },
-  {
-    id: 'ins-6',
-    icon: 'Landmark',
-    tone: 'sky',
-    tag: 'Debt',
-    title: 'Prepaying ₹10,000 towards your personal loan saves you interest.',
-    body: 'At 11.5%, an extra payment now shortens the tenor instead of paying interest.',
-  },
-]
+export const INSIGHTS = []
 
 /* ------------------------------------------------------------------ */
-/* SPENANCE AI — predefined knowledge base (no real API)              */
+/* SPENANCE AI — Knowledge Base                                        */
 /* ------------------------------------------------------------------ */
 
 export const AI_GREETING =
-  "Hi Rahul! I've analyzed your recent spending. Here are a few things you may want to know."
+  "Hi there! I'm your AI Financial Consultant. Add your expenses and income to get real-time insights."
 
-export const AI_INSIGHT_CARDS = [
-  {
-    id: 'ai-1',
-    icon: 'AlertTriangle',
-    tone: 'amber',
-    title: 'Food expenses increased by 18%.',
-    body: '₹6,200 was spent on food in September, up from ₹5,250 in August.',
-  },
-  {
-    id: 'ai-2',
-    icon: 'Lightbulb',
-    tone: 'emerald',
-    title: 'You could save approximately ₹1,500 this month.',
-    body: 'Reducing food delivery and impulse shopping gets you there without lifestyle cuts.',
-  },
-  {
-    id: 'ai-3',
-    icon: 'Target',
-    tone: 'sky',
-    title: 'Your current savings rate is 36.3%.',
-    body: 'That is ₹16,350 saved out of ₹45,000 earned in September.',
-  },
-]
+export const AI_INSIGHT_CARDS = []
 
 export const AI_SUGGESTED_QUESTIONS = [
   'How can I save more?',
   'Where am I spending the most?',
   'How is my financial health?',
-  'Can I afford a new phone?',
+  'Can I afford a new purchase?',
   'How much should I save every month?',
   'Analyze my spending',
 ]
 
-/**
- * Keyword-matched canned responses. First match wins, so order matters:
- * more specific intents are listed before the generic ones.
- */
 export const AI_KNOWLEDGE = [
   {
     id: 'save',
     keywords: ['save', 'saving', 'save more', 'cut', 'reduce', 'optimize'],
     response:
-      'Based on your current spending, your food and shopping expenses are the easiest areas to optimize. Reducing these categories by around ₹2,000 per month could increase your savings.',
+      'To build a healthy savings habit, target saving at least 20-30% of your net income every month. Start by setting category budgets for discretionary spending like Food and Shopping.',
     highlights: [
-      'Food: ₹6,200 (18% higher than August)',
-      'Shopping: ₹4,800 — 96% of its budget',
-      'Potential monthly saving: ₹2,000',
+      'Target: 20-30% savings rate',
+      'Optimize: Food & Entertainment',
+      'Strategy: Set monthly envelope limits',
     ],
   },
   {
@@ -671,88 +283,55 @@ export const AI_KNOWLEDGE = [
       'breakdown',
     ],
     response:
-      'Your largest category this month is Bills at ₹7,250 (25.3% of total spend), driven by rent share, electricity and broadband. Food follows at ₹6,200 and Other at ₹5,500.',
+      'Check your Expenses breakdown chart to see your largest spending envelope in real-time. Bills and Housing typically represent 30-40% of standard budgets.',
     highlights: [
-      'Bills — ₹7,250 (25.3%)',
-      'Food — ₹6,200 (21.6%)',
-      'Other — ₹5,500 (19.2%)',
+      'Review: Expenses Breakdown',
+      'Focus: High frequency transactions',
+      'Rule: 50/30/20 budget framework',
     ],
   },
   {
     id: 'health',
     keywords: ['financial health', 'health', 'score', 'how am i doing', 'rating'],
     response:
-      'Your financial health is solid. The SPENANCE score is 82/100 — rated Good — with a 36.3% savings rate and a 24% debt-to-income ratio. Building a slightly larger emergency buffer would push you into the Excellent band.',
+      'Your Financial Health Score is computed continuously across 4 key pillars: Savings Discipline, Budget Control, Debt Management, and your Emergency Buffer.',
     highlights: [
-      'Score: 82 / 100 (Good)',
-      'Savings rate: 36.3%',
-      'Debt-to-income: 24%',
+      '4 Pillars of financial fitness',
+      'Aim for a score above 75 (Good)',
+      'Keep 3-6 months liquid emergency fund',
     ],
   },
   {
     id: 'phone',
     keywords: ['afford', 'phone', 'iphone', 'laptop', 'buy', 'purchase'],
     response:
-      'Yes — you could comfortably afford a phone up to about ₹35,000. Your monthly surplus is ₹16,350, so paying in full would still leave you with a healthy buffer. If you finance it, keep the EMI under ₹1,500 so your total debt obligations stay below 30% of income.',
+      'Before large purchases, ensure your emergency fund covers at least 3 months of essential expenses, and keep any recurring EMI obligations below 30% of your monthly income.',
     highlights: [
-      'Safe spend: up to ₹35,000',
-      'Monthly surplus: ₹16,350',
-      'Recommended max EMI: ₹1,500',
+      'Check emergency fund first',
+      'Keep EMI below 30% of income',
+      'Avoid high-interest consumer debt',
     ],
   },
   {
     id: 'howmuch',
     keywords: ['how much should', 'target', 'ideal', 'percentage', '30%', 'rule'],
     response:
-      'A healthy target is 30–40% of income. You are already at 36.3% (₹16,350). Locking in ₹18,000 per month would get you to 40% and fully fund a ₹1 lakh emergency buffer within six months.',
+      'A widely recommended benchmark is the 50/30/20 rule: 50% for Needs (rent, bills, groceries), 30% for Wants (dining out, entertainment), and at least 20% for Savings and debt repayment.',
     highlights: [
-      'Recommended: 30–40% of income',
-      'Your current rate: 36.3%',
-      'Stretch goal: ₹18,000 / month',
-    ],
-  },
-  {
-    id: 'budget',
-    keywords: ['budget', 'envelope', 'limit', 'left'],
-    response:
-      'You have used 81.8% of your ₹35,000 September budget and ₹6,350 still remains. Shopping (96%) and Other (91.7%) are your tightest envelopes, while Food and Transport still have room.',
-    highlights: [
-      'Budget used: ₹28,650 of ₹35,000',
-      'Remaining: ₹6,350',
-      'Tightest: Shopping at 96%',
+      '50% Needs (Rent, Utilities, Food)',
+      '30% Wants (Leisure, Travel)',
+      '20% Savings & Debt elimination',
     ],
   },
   {
     id: 'loan',
     keywords: ['loan', 'emi', 'debt', 'repay', 'prepay', 'interest'],
     response:
-      'You have two active loans — a ₹4,25,000 education loan at 8.5% (EMI ₹8,500) and a ₹72,000 personal loan at 11.5% (EMI ₹4,200). Target the personal loan first: at the higher rate, every ₹10,000 prepaid saves you roughly ₹1,150 in interest.',
+      'When paying down debt, prioritize loans with the highest interest rates first (Avalanche method). Even small periodic prepayments significantly reduce your total interest and tenure.',
     highlights: [
-      'Total monthly EMI: ₹12,700',
-      'Highest rate: 11.5% personal loan',
-      'Next EMI: 05 October 2026',
-    ],
-  },
-  {
-    id: 'food',
-    keywords: ['food', 'swiggy', 'zomato', 'grocery', 'eating out'],
-    response:
-      'Food is ₹6,200 this month, 18% above August. Delivery orders (Swiggy, Zomato) alone are ₹2,200 — capping delivery to twice a month would bring food back to about ₹5,400.',
-    highlights: [
-      'Food total: ₹6,200',
-      'Delivery apps: ₹2,200',
-      'Potential saving: ₹800',
-    ],
-  },
-  {
-    id: 'invest',
-    keywords: ['invest', 'sip', 'mutual fund', 'stock', 'wealth'],
-    response:
-      'With a ₹16,350 monthly surplus you could start a ₹5,000 SIP in an index fund right away. Keep three months of expenses (≈₹85,950) liquid first, then invest the rest on the 5th of every month for automatic discipline.',
-    highlights: [
-      'Suggested SIP: ₹5,000 / month',
-      'Keep liquid: ₹85,950 (3 months)',
-      'Best date: right after salary credit',
+      'Target highest interest rate loans first',
+      'Every extra principal payment saves interest',
+      'Keep total debt-to-income below 30%',
     ],
   },
 ]
@@ -760,10 +339,10 @@ export const AI_KNOWLEDGE = [
 export const AI_FALLBACK = {
   id: 'fallback',
   response:
-    "I can help with budgeting, expense trends, loans, EMIs and savings. Here's what stands out right now: your September savings rate is 36.3%, Bills is your largest category at ₹7,250, and your budget is 81.8% used with ₹6,350 remaining.",
+    "I'm here to help with budgeting, expense trends, loans, EMIs, and savings strategies. Ask me any question or record transactions to receive instant financial analysis.",
   highlights: [
-    'Savings rate: 36.3%',
-    'Largest category: Bills (₹7,250)',
-    'Budget remaining: ₹6,350',
+    'Smart Budget Tracking',
+    'Real-time EMI Calculations',
+    'Actionable Savings Strategies',
   ],
 }

@@ -18,10 +18,14 @@ import Modal from './ui/Modal'
 import Button from './ui/Button'
 import ProgressBar from './ui/ProgressBar'
 
-const DEMO_TODAY = '2026-09-27'
-const DEMO_NEXT_DUE = '2026-10-05'
+const getTodayIso = () => new Date().toISOString().split('T')[0]
+const getNextMonthDueIso = () => {
+  const d = new Date()
+  d.setMonth(d.getMonth() + 1)
+  return d.toISOString().split('T')[0]
+}
 
-const EMPTY = {
+const getEmptyLoanForm = () => ({
   name: '',
   lender: '',
   type: 'Personal',
@@ -31,11 +35,11 @@ const EMPTY = {
   emi: '',
   tenureMonths: '24',
   paidMonths: '0',
-  startDate: DEMO_TODAY,
-  nextPaymentDate: DEMO_NEXT_DUE,
+  startDate: getTodayIso(),
+  nextPaymentDate: getNextMonthDueIso(),
   purpose: '',
   coApplicant: '',
-}
+})
 
 /**
  * Add a loan to the tracker. EMI can be typed in manually or derived from
@@ -43,13 +47,13 @@ const EMPTY = {
  */
 export default function AddLoanModal({ open, onClose, initial = null }) {
   const { addLoan, pushToast } = useApp()
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(getEmptyLoanForm)
   const [errors, setErrors] = useState({})
   const [autoEmi, setAutoEmi] = useState(true)
 
   useEffect(() => {
     if (!open) return
-    setForm({ ...EMPTY, ...(initial || {}) })
+    setForm({ ...getEmptyLoanForm(), ...(initial || {}) })
     setErrors({})
     setAutoEmi(!initial?.emi)
   }, [open, initial])

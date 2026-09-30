@@ -4,18 +4,30 @@ import {
   Check,
   Database,
   Download,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  KeyRound,
   Mail,
   Moon,
   Palette,
   Phone,
   RotateCcw,
   Save,
+  ShieldCheck,
+  Sparkles,
   Sun,
   UserRound,
   Wallet,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { formatINR } from '../utils/format'
+import {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  isGeminiConfigured,
+  testGeminiApiKey,
+} from '../services/geminiService'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Card, { CardHeader } from '../components/ui/Card'
@@ -24,8 +36,8 @@ import Switch from '../components/ui/Switch'
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹', label: 'Indian Rupee' },
-  { code: 'USD', symbol: '$', label: 'US Dollar (demo)' },
-  { code: 'EUR', symbol: '€', label: 'Euro (demo)' },
+  { code: 'USD', symbol: '$', label: 'US Dollar' },
+  { code: 'EUR', symbol: '€', label: 'Euro' },
 ]
 
 export default function Settings() {
@@ -41,6 +53,8 @@ export default function Settings() {
     budgets,
     score,
     savingsRate,
+    session,
+    isFirebaseConfigured,
   } = useApp()
 
   const [draft, setDraft] = useState({
@@ -53,6 +67,12 @@ export default function Settings() {
   })
   const [resetOpen, setResetOpen] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  /* Gemini AI state */
+  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getGeminiApiKey())
+  const [showGeminiKey, setShowGeminiKey] = useState(false)
+  const [geminiTesting, setGeminiTesting] = useState(false)
+  const [isGeminiActive, setIsGeminiActive] = useState(() => isGeminiConfigured())
 
   /* Re-sync only when the saved profile fields change (not when an unrelated
      preference such as a notification toggle is updated), so unsaved edits
@@ -149,15 +169,60 @@ export default function Settings() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'spenance-demo-data.json'
+    link.download = 'spenance-financial-data.json'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     pushToast({
       title: 'Export ready',
-      body: 'spenance-demo-data.json downloaded with your local data.',
-      tone: 'sky',
+      body: 'spenance-financial-data.json downloaded with your account data.',
+      tone: 'emerald',
+    })
+  }
+
+  const handleSaveGeminiKey = async () => {
+    const trimmed = geminiKeyInput.trim()
+    if (!trimmed) {
+      setGeminiApiKey('')
+      setIsGeminiActive(false)
+      pushToast({
+        title: 'Gemini Key Removed',
+        body: 'SPENANCE AI will use the built-in offline financial model.',
+        tone: 'amber',
+      })
+      return
+    }
+
+    setGeminiTesting(true)
+    const result = await testGeminiApiKey(trimmed)
+    setGeminiTesting(false)
+
+    if (result.success) {
+      setGeminiApiKey(trimmed)
+      setIsGeminiActive(true)
+      pushToast({
+        title: 'Google Gemini Pro Connected! ⚡',
+        body: 'Real-time AI reasoning enabled across all your financial accounts and loans.',
+        tone: 'emerald',
+      })
+    } else {
+      pushToast({
+        title: 'Gemini Key Verification Failed',
+        body: result.error || 'Please check that your API key is valid.',
+        tone: 'rose',
+      })
+    }
+  }
+
+  const handleClearGeminiKey = () => {
+    setGeminiApiKey('')
+    setGeminiKeyInput('')
+    setIsGeminiActive(false)
+    pushToast({
+      title: 'API Key Cleared',
+      body: 'Switched to built-in offline financial rules.',
+      tone: 'slate',
     })
   }
 
@@ -169,11 +234,13 @@ export default function Settings() {
             Settings
           </h2>
           <p className="muted mt-1 text-[13px] sm:text-sm">
-            Manage your profile, preferences and demo data.
+            Manage your profile, preferences and account settings.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="emerald">Demo account</Badge>
+          <Badge tone="emerald">
+            {session?.isFirebaseUser ? 'Firebase Cloud Account' : 'Active Account'}
+          </Badge>
           <Button
             icon={saved ? Check : Save}
             onClick={saveProfile}
@@ -462,13 +529,34 @@ export default function Settings() {
         {/* --------------------------------------------------------- data */}
         <Card className="card-pad animate-rise">
           <CardHeader
-            eyebrow="Demo data"
-            title="Storage & reset"
-            subtitle="Everything lives in localStorage on this device."
+            eyebrow={isFirebaseConfigured && session?.isFirebaseUser ? 'Cloud Sync' : 'Local Storage'}
+            title="Database & Storage"
+            subtitle={
+              isFirebaseConfigured && session?.isFirebaseUser
+                ? 'Your data is synchronized in real-time with Google Cloud Firestore.'
+                : 'Running in local browser storage mode. Add Firebase keys in .env to enable Cloud DB.'
+            }
             action={<Database size={18} className="text-slate-400" />}
           />
 
           <dl className="mt-5 space-y-2 text-[12px]">
+            <div className="flex items-center justify-between">
+              <dt className="muted font-medium">Backend status</dt>
+              <dd className="tabular heading font-semibold">
+                <span className={`inline-flex items-center gap-1.5 ${isFirebaseConfigured ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  <span className={`h-2 w-2 rounded-full ${isFirebaseConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  {isFirebaseConfigured ? 'Cloud Firestore Active' : 'Local Storage'}
+                </span>
+              </dd>
+            </div>
+            {session?.isFirebaseUser ? (
+              <div className="flex items-center justify-between">
+                <dt className="muted font-medium">Synced account</dt>
+                <dd className="tabular heading font-semibold truncate max-w-[150px]">
+                  {session.email}
+                </dd>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between">
               <dt className="muted font-medium">Transactions</dt>
               <dd className="tabular heading font-semibold">
@@ -488,58 +576,139 @@ export default function Settings() {
           </dl>
 
           <div className="mt-5 flex flex-col gap-2">
-            <Button variant="ghost" icon={Download} onClick={exportData}>
+            <Button variant="outline" icon={Download} onClick={exportData} className="w-full">
               Export my data (JSON)
             </Button>
             <Button
-              variant="danger"
+              variant="ghost"
               icon={RotateCcw}
-              onClick={() => setResetOpen(true)}
+              onClick={async () => {
+                if (window.confirm('Reset all financial data, budgets, and transactions to zero?')) {
+                  await resetDemoData()
+                  pushToast({
+                    title: 'Account reset to zero',
+                    body: 'All transactions, loans, and budgets have been cleared.',
+                    tone: 'emerald',
+                  })
+                }
+              }}
+              className="w-full text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
             >
-              Reset demo data
+              Reset all data to zero
             </Button>
           </div>
 
           <p className="muted mt-4 text-[11px] leading-snug">
-            SPENANCE is a frontend prototype: no backend, no accounts and no
-            real payments are connected.
+            {isFirebaseConfigured
+              ? 'Changes update instantly in Cloud Firestore and sync across all devices.'
+              : 'Add your Firebase configuration to .env to turn this into a live multi-user Cloud database!'}
           </p>
         </Card>
-      </div>
 
-      <Modal
-        open={resetOpen}
-        onClose={() => setResetOpen(false)}
-        title="Reset all demo data?"
-        description="Expenses, budgets, notifications and chat history return to defaults."
-        icon={RotateCcw}
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setResetOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                resetDemoData()
-                setResetOpen(false)
-                pushToast({
-                  title: 'Demo data restored',
-                  body: 'September 2026 dataset reloaded.',
-                  tone: 'sky',
-                })
-              }}
-            >
-              Reset everything
-            </Button>
-          </>
-        }
-      >
-        <p className="muted text-[13px] leading-relaxed">
-          This clears the localStorage snapshot used by the demo and restores the
-          original {transactions.length} transactions.
-        </p>
-      </Modal>
+        {/* ----------------------------------------------------- Gemini AI */}
+        <Card className="card-pad animate-rise xl:col-span-2">
+          <CardHeader
+            eyebrow="Artificial Intelligence"
+            title="Google Gemini AI Engine"
+            subtitle="Connects Gemini 1.5 Pro to conduct live, real-time portfolio audits and financial coaching."
+            action={<Sparkles size={18} className="text-emerald-500" />}
+          />
+
+          <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-4">
+              <div>
+                <label className="eyebrow mb-1.5 block" htmlFor="gemini-key">
+                  Gemini API Key
+                </label>
+                <div className="relative flex items-center">
+                  <span className="pointer-events-none absolute left-3 text-slate-400">
+                    <KeyRound size={16} />
+                  </span>
+                  <input
+                    id="gemini-key"
+                    type={showGeminiKey ? 'text' : 'password'}
+                    placeholder="AIzaSy..."
+                    value={geminiKeyInput}
+                    onChange={(e) => setGeminiKeyInput(e.target.value)}
+                    className="input pl-9 pr-10 font-mono text-[13px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKey((prev) => !prev)}
+                    className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    title={showGeminiKey ? 'Hide key' : 'Show key'}
+                  >
+                    {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="muted mt-2 text-[11px]">
+                  Keys are stored locally in your browser. Get your free key from{' '}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-emerald-600 hover:underline dark:text-emerald-400 inline-flex items-center gap-0.5"
+                  >
+                    Google AI Studio <ExternalLink size={10} />
+                  </a>
+                  .
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  variant="primary"
+                  icon={Save}
+                  onClick={handleSaveGeminiKey}
+                  disabled={geminiTesting}
+                >
+                  {geminiTesting ? 'Verifying Key...' : 'Test & Save Key'}
+                </Button>
+                {isGeminiActive ? (
+                  <Button
+                    variant="ghost"
+                    onClick={handleClearGeminiKey}
+                    className="text-slate-500 hover:text-rose-600"
+                  >
+                    Remove Key
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/40 space-y-3">
+              <p className="heading text-[12px] font-semibold uppercase tracking-wider text-slate-500">
+                AI Engine Status
+              </p>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isGeminiActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                <span className="heading text-[13px] font-bold">
+                  {isGeminiActive ? 'Gemini 1.5 Pro Connected' : 'Offline Rule Engine'}
+                </span>
+              </div>
+              <p className="muted text-[11px] leading-relaxed">
+                {isGeminiActive
+                  ? 'Your AI Consultant analyzes live transaction streams, debt-to-income, and savings trajectory with Google Gemini Pro.'
+                  : 'Without an API key, the assistant falls back to built-in financial heuristics. Add a free Gemini key above to unlock full generative AI.'}
+              </p>
+              <div className="pt-1 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="muted">Primary Model</span>
+                  <span className="heading font-mono font-medium">gemini-1.5-pro</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] mt-1">
+                  <span className="muted">Fallback Model</span>
+                  <span className="heading font-mono font-medium">gemini-1.5-flash</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }

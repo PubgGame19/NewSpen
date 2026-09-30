@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -23,27 +24,46 @@ import { financialScore, ratioPercent, scoreLabel } from '../utils/finance'
 import { formatShortDate } from '../utils/format'
 import { clearSession, readSession, writeSession } from '../utils/auth'
 import { syncBrowserChrome } from '../utils/brandIcons'
+import { isFirebaseConfigured } from '../config/firebase'
+import {
+  onAuthChange,
+  subscribeToUserData,
+  addTransactionFirestore,
+  batchAddTransactionsFirestore,
+  deleteTransactionFirestore,
+  updateTransactionFirestore,
+  batchDeleteTransactionsFirestore,
+  updateBudgetsFirestore,
+  addLoanFirestore,
+  updateLoanFirestore,
+  deleteLoanFirestore,
+  updateProfileFirestore,
+  logoutUser,
+  resetAllUserDataFirestore,
+} from '../services/firebaseService'
+import {
+  subscribeToRecurringRules,
+  addRecurringRule as addRecurringRuleService,
+  updateRecurringRule as updateRecurringRuleService,
+  deleteRecurringRule as deleteRecurringRuleService,
+  evaluateDueRecurringRules,
+} from '../services/recurringService'
 
-const STORAGE_KEY = 'spenance.state.v1'
+const STORAGE_KEY = 'spenance.state.v3'
 
-/** Net of the seeded September dataset (₹45,000 in − ₹28,650 out) */
-const SEED_NET = INITIAL_TRANSACTIONS.reduce((sum, t) => sum + t.amount, 0)
-const SEED_EXPENSES = Math.abs(
-  INITIAL_TRANSACTIONS.filter((t) => t.amount < 0).reduce(
-    (sum, t) => sum + t.amount,
-    0,
-  ),
-)
-const BASE_BALANCE = 52450
-const SAVINGS_BASE = 10000
+/** Net and base seeds are 0 for clean production */
+const SEED_NET = 0
+const SEED_EXPENSES = 0
+const BASE_BALANCE = 0
+const SAVINGS_BASE = 0
 
 const DEFAULT_CHAT = [
   {
     id: 'msg-0',
     role: 'ai',
-    text: "Hi Rahul! I've analyzed your recent spending. Here are a few things you may want to know.",
+    text: "Hi there! I'm your AI Financial Consultant. Add your expenses and income to get real-time insights.",
     highlights: [],
-    time: '09:14',
+    time: '09:00',
   },
 ]
 
@@ -64,12 +84,30 @@ function loadState() {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return INITIAL_STATE
     const parsed = JSON.parse(raw)
+    const mockTxnIds = new Set(
+      Array.from({ length: 30 }, (_, i) => `txn-${String(i + 1).padStart(2, '0')}`)
+    )
+    const cleanTxns = Array.isArray(parsed.transactions)
+      ? parsed.transactions.filter((t) => !mockTxnIds.has(t.id))
+      : []
+    const cleanLoans = Array.isArray(parsed.loans)
+      ? parsed.loans.filter((l) => l.id !== 'loan-edu' && l.id !== 'loan-personal')
+      : []
+    const cleanProfile = {
+      ...INITIAL_STATE.profile,
+      ...(parsed.profile || {}),
+    }
+    if (cleanProfile.monthlyIncome === 45000) cleanProfile.monthlyIncome = 0
+    if (cleanProfile.emergencyFund === 68000) cleanProfile.emergencyFund = 0
+    if (cleanProfile.debtToIncome === 24) cleanProfile.debtToIncome = 0
+
     return {
       ...INITIAL_STATE,
       ...parsed,
-      profile: { ...INITIAL_STATE.profile, ...(parsed.profile || {}) },
-      budgets: { ...INITIAL_STATE.budgets, ...(parsed.budgets || {}) },
-      loans: Array.isArray(parsed.loans) ? parsed.loans : INITIAL_STATE.loans,
+      transactions: cleanTxns,
+      loans: cleanLoans,
+      profile: cleanProfile,
+      budgets: parsed.budgets?.Food === 8000 ? DEFAULT_BUDGETS : (parsed.budgets || DEFAULT_BUDGETS),
     }
   } catch {
     return INITIAL_STATE
@@ -87,6 +125,106 @@ export function AppProvider({ children }) {
   const [toasts, setToasts] = useState([])
   /* "Add expense" modal is shared by the header and the pages */
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  /* Recurring rules state */
+  const [recurringRules, setRecurringRules] = useState([])
+  const [recurringModalOpen, setRecurringModalOpen] = useState(false)
+
+  /* ---------------------- Firebase Auth State Listener ------------------- */
+  useEffect(() => {
+    if (!isFirebaseConfigured) return
+
+    const unsubscribe = onAuthChange((firebaseUser) => {
+      if (firebaseUser) {
+        const name = firebaseUser.displayName || firebaseUser.email.split('@')[0]
+        const initials = name
+          .split(/[\s._-]+/)
+          .filter(Boolean)
+          .map((part) => part[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase() || 'U'
+
+        const nextSession = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name,
+          initials,
+          accountType: 'Firebase Account',
+          isDemo: false,
+          isFirebaseUser: true,
+          signedInAt: new Date().toISOString(),
+        }
+        writeSession(nextSession, true)
+        setSession(nextSession)
+        setJustSignedOut(false)
+      } else {
+        setSession((prev) => {
+          if (prev?.isFirebaseUser) {
+            clearSession()
+            return null
+          }
+          return prev
+        })
+      }
+    })
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+    }
+  }, [])
+
+  /* ------------------ Firestore Realtime Sync Listener ------------------- */
+  useEffect(() => {
+    if (!session?.isFirebaseUser || !session?.uid) return
+
+    const mockTxnIds = new Set(
+      Array.from({ length: 30 }, (_, i) => `txn-${String(i + 1).padStart(2, '0')}`)
+    )
+
+    const unsubscribe = subscribeToUserData(session.uid, {
+      onUserData: (data) => {
+        if (!data) return
+        setState((prev) => {
+          const profile = data.profile ? { ...prev.profile, ...data.profile } : prev.profile
+          if (profile.monthlyIncome === 45000) profile.monthlyIncome = 0
+          if (profile.emergencyFund === 68000) profile.emergencyFund = 0
+          if (profile.debtToIncome === 24) profile.debtToIncome = 0
+          const budgets = data.budgets?.Food === 8000 ? DEFAULT_BUDGETS : (data.budgets || prev.budgets)
+          return {
+            ...prev,
+            profile,
+            budgets,
+          }
+        })
+      },
+      onTransactions: (txns) => {
+        if (Array.isArray(txns)) {
+          const clean = txns.filter((t) => !mockTxnIds.has(t.id))
+          setState((prev) => ({ ...prev, transactions: clean }))
+        }
+      },
+      onLoans: (loans) => {
+        if (Array.isArray(loans)) {
+          const clean = loans.filter((l) => l.id !== 'loan-edu' && l.id !== 'loan-personal')
+          setState((prev) => ({ ...prev, loans: clean }))
+        }
+      },
+    })
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+    }
+  }, [session?.uid, session?.isFirebaseUser])
+
+  /* ------------------- Recurring Rules Subscription --------------------- */
+  useEffect(() => {
+    const unsub = subscribeToRecurringRules(session?.uid, (rules) => {
+      setRecurringRules(rules || [])
+    })
+    return () => {
+      if (typeof unsub === 'function') unsub()
+    }
+  }, [session?.uid])
 
   /* ----------------------------- persistence ---------------------------- */
   useEffect(() => {
@@ -127,11 +265,18 @@ export function AppProvider({ children }) {
     setJustSignedOut(false)
   }, [])
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    if (session?.isFirebaseUser) {
+      try {
+        await logoutUser()
+      } catch (err) {
+        console.warn('Firebase logout warning:', err)
+      }
+    }
     clearSession()
     setSession(null)
     setJustSignedOut(true)
-  }, [])
+  }, [session?.isFirebaseUser])
 
   /* ------------------------------ mutations ----------------------------- */
   const addTransaction = useCallback(
@@ -149,110 +294,373 @@ export function AppProvider({ children }) {
         ...prev,
         transactions: [record, ...prev.transactions],
       }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        addTransactionFirestore(session.uid, record).catch(console.error)
+      }
+
       return record
     },
-    [],
+    [session?.isFirebaseUser, session?.uid],
   )
 
-  const deleteTransaction = useCallback((id) => {
-    setState((prev) => ({
-      ...prev,
-      transactions: prev.transactions.filter((t) => t.id !== id),
-    }))
-  }, [])
+  const addTransactionsBatch = useCallback(
+    (newTxns) => {
+      if (!Array.isArray(newTxns) || newTxns.length === 0) return []
+      const prepared = newTxns.map((t, idx) => ({
+        id: t.id || `txn-${Date.now()}-${idx}-${Math.random().toString(16).slice(2, 6)}`,
+        date: t.date || new Date().toISOString().slice(0, 10),
+        description:
+          t.description ||
+          t.rawDescription ||
+          (t.note ? t.note.replace(/^Ref:\s*/i, '') : '') ||
+          'Bank Transaction',
+        note: t.note || '',
+        category: t.category || 'Other',
+        method: t.method || 'UPI',
+        amount: Number(t.amount) || 0,
+      }))
 
-  const updateBudgets = useCallback((nextBudgets) => {
-    setState((prev) => ({ ...prev, budgets: { ...prev.budgets, ...nextBudgets } }))
-  }, [])
+      setState((prev) => ({
+        ...prev,
+        transactions: [...prepared, ...prev.transactions],
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        batchAddTransactionsFirestore(session.uid, prepared).catch(console.error)
+      }
+
+      return prepared
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  /* Auto-process due recurring transactions once rules are loaded */
+  const hasEvaluatedRecurring = useRef(false)
+  useEffect(() => {
+    if (!recurringRules || recurringRules.length === 0 || hasEvaluatedRecurring.current) return
+    hasEvaluatedRecurring.current = true
+
+    const { transactionsToCreate, updatedRules } = evaluateDueRecurringRules(recurringRules)
+    if (transactionsToCreate.length > 0) {
+      addTransactionsBatch(transactionsToCreate)
+      for (const rule of updatedRules) {
+        updateRecurringRuleService(session?.uid, rule.id, {
+          lastRunDate: rule.lastRunDate,
+          nextRunDate: rule.nextRunDate,
+        }).catch(console.error)
+      }
+      setRecurringRules((prev) =>
+        prev.map((r) => {
+          const match = updatedRules.find((u) => u.id === r.id)
+          return match ? { ...r, ...match } : r
+        }),
+      )
+      pushToast({
+        title: 'Auto-Recurring Run ⚡',
+        body: `Processed ${transactionsToCreate.length} automated scheduled transactions.`,
+        tone: 'emerald',
+      })
+    }
+  }, [recurringRules, addTransactionsBatch, session?.uid, pushToast])
+
+  const deleteTransaction = useCallback(
+    (id) => {
+      setState((prev) => ({
+        ...prev,
+        transactions: prev.transactions.filter((t) => t.id !== id),
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        deleteTransactionFirestore(session.uid, id).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const updateTransaction = useCallback(
+    (id, patch) => {
+      setState((prev) => ({
+        ...prev,
+        transactions: prev.transactions.map((t) =>
+          t.id === id ? { ...t, ...patch } : t
+        ),
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        updateTransactionFirestore(session.uid, id, patch).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const deleteTransactionsBatch = useCallback(
+    (ids) => {
+      if (!Array.isArray(ids) || ids.length === 0) return
+      const idSet = new Set(ids)
+      setState((prev) => ({
+        ...prev,
+        transactions: prev.transactions.filter((t) => !idSet.has(t.id)),
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        batchDeleteTransactionsFirestore(session.uid, ids).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const deleteTransactionsByAmount = useCallback(
+    (targetAmount) => {
+      const target = Math.abs(targetAmount)
+      const matchingIds = state.transactions
+        .filter((t) => Math.abs(t.amount) === target)
+        .map((t) => t.id)
+      if (matchingIds.length === 0) return 0
+      deleteTransactionsBatch(matchingIds)
+      return matchingIds.length
+    },
+    [state.transactions, deleteTransactionsBatch],
+  )
+
+  const deleteTransactionsByDescription = useCallback(
+    (targetDesc) => {
+      const matchingIds = state.transactions
+        .filter((t) => t.description === targetDesc)
+        .map((t) => t.id)
+      if (matchingIds.length === 0) return 0
+      deleteTransactionsBatch(matchingIds)
+      return matchingIds.length
+    },
+    [state.transactions, deleteTransactionsBatch],
+  )
+
+  const updateBudgets = useCallback(
+    (nextBudgets) => {
+      setState((prev) => {
+        const merged = { ...prev.budgets, ...nextBudgets }
+        if (session?.isFirebaseUser && session?.uid) {
+          updateBudgetsFirestore(session.uid, merged).catch(console.error)
+        }
+        return { ...prev, budgets: merged }
+      })
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
 
   /* ------------------------------- loans -------------------------------- */
 
-  const addLoan = useCallback((loan) => {
-    const record = {
-      status: 'Active',
-      coApplicant: '—',
-      moratorium: 'Not applicable',
-      purpose: 'Added from the demo loan manager',
-      paidMonths: 0,
-      ...loan,
-      id: loan.id || `loan-${Date.now()}`,
-      accountNumber:
-        loan.accountNumber ||
-        `•••• ${String(Math.floor(1000 + Math.random() * 9000))}`,
-    }
-    setState((prev) => ({ ...prev, loans: [...prev.loans, record] }))
-    return record
-  }, [])
+  const addLoan = useCallback(
+    (loan) => {
+      const record = {
+        status: 'Active',
+        coApplicant: '—',
+        moratorium: 'Not applicable',
+        purpose: 'Added from loan manager',
+        paidMonths: 0,
+        ...loan,
+        id: loan.id || `loan-${Date.now()}`,
+        accountNumber:
+          loan.accountNumber ||
+          `•••• ${String(Math.floor(1000 + Math.random() * 9000))}`,
+      }
+      setState((prev) => ({ ...prev, loans: [...prev.loans, record] }))
 
-  const updateLoan = useCallback((id, patch) => {
-    setState((prev) => ({
-      ...prev,
-      loans: prev.loans.map((loan) =>
-        loan.id === id ? { ...loan, ...patch } : loan,
-      ),
-    }))
-  }, [])
+      if (session?.isFirebaseUser && session?.uid) {
+        addLoanFirestore(session.uid, record).catch(console.error)
+      }
 
-  const deleteLoan = useCallback((id) => {
-    setState((prev) => ({
-      ...prev,
-      loans: prev.loans.filter((loan) => loan.id !== id),
-    }))
-  }, [])
+      return record
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const updateLoan = useCallback(
+    (id, patch) => {
+      setState((prev) => ({
+        ...prev,
+        loans: prev.loans.map((loan) =>
+          loan.id === id ? { ...loan, ...patch } : loan,
+        ),
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        updateLoanFirestore(session.uid, id, patch).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const deleteLoan = useCallback(
+    (id) => {
+      setState((prev) => ({
+        ...prev,
+        loans: prev.loans.filter((loan) => loan.id !== id),
+      }))
+
+      if (session?.isFirebaseUser && session?.uid) {
+        deleteLoanFirestore(session.uid, id).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
 
   /**
    * Simulates one instalment: the interest portion goes to the lender, the
    * rest reduces the outstanding balance and the due date moves a month on.
    */
-  const payEmi = useCallback((id) => {
-    let receipt = null
-    setState((prev) => ({
-      ...prev,
-      loans: prev.loans.map((loan) => {
-        if (loan.id !== id) return loan
-        const interest = Math.round(
-          (loan.outstanding * loan.interestRate) / 12 / 100,
-        )
-        const principal = Math.max(0, loan.emi - interest)
-        const outstanding = Math.max(0, loan.outstanding - principal)
-        const next = new Date(`${loan.nextPaymentDate}T00:00:00`)
-        next.setMonth(next.getMonth() + 1)
-        const nextPaymentDate = `${next.getFullYear()}-${String(
-          next.getMonth() + 1,
-        ).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
-        receipt = { interest, principal, outstanding, nextPaymentDate }
-        return {
-          ...loan,
-          outstanding,
-          paidMonths: Math.min(loan.tenureMonths, loan.paidMonths + 1),
-          nextPaymentDate,
-          status: outstanding <= 0 ? 'Closed' : loan.status,
-        }
-      }),
-    }))
-    return receipt
-  }, [])
+  const payEmi = useCallback(
+    (id) => {
+      let receipt = null
+      let updatedPatch = null
+      setState((prev) => ({
+        ...prev,
+        loans: prev.loans.map((loan) => {
+          if (loan.id !== id) return loan
+          const interest = Math.round(
+            (loan.outstanding * loan.interestRate) / 12 / 100,
+          )
+          const principal = Math.max(0, loan.emi - interest)
+          const outstanding = Math.max(0, loan.outstanding - principal)
+          const next = new Date(`${loan.nextPaymentDate}T00:00:00`)
+          next.setMonth(next.getMonth() + 1)
+          const nextPaymentDate = `${next.getFullYear()}-${String(
+            next.getMonth() + 1,
+          ).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+          receipt = { interest, principal, outstanding, nextPaymentDate }
+          updatedPatch = {
+            outstanding,
+            paidMonths: Math.min(loan.tenureMonths, loan.paidMonths + 1),
+            nextPaymentDate,
+            status: outstanding <= 0 ? 'Closed' : loan.status,
+          }
+          return {
+            ...loan,
+            ...updatedPatch,
+          }
+        }),
+      }))
 
-  const updateProfile = useCallback((patch) => {
-    setState((prev) => ({ ...prev, profile: { ...prev.profile, ...patch } }))
-  }, [])
+      if (session?.isFirebaseUser && session?.uid && updatedPatch) {
+        updateLoanFirestore(session.uid, id, updatedPatch).catch(console.error)
+      }
+
+      return receipt
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const updateProfile = useCallback(
+    (patch) => {
+      setState((prev) => ({ ...prev, profile: { ...prev.profile, ...patch } }))
+      if (session?.isFirebaseUser && session?.uid) {
+        updateProfileFirestore(session.uid, patch).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
 
   /**
    * Changing the salary keeps the whole app coherent: the income credit is
    * re-written so cash-flow, savings rate and score all follow the new figure.
    */
-  const setMonthlyIncome = useCallback((amount) => {
-    const value = Math.max(0, Math.round(Number(amount) || 0))
-    setState((prev) => ({
-      ...prev,
-      profile: { ...prev.profile, monthlyIncome: value },
-      transactions: prev.transactions.map((txn) =>
-        txn.amount > 0 && /salary|payroll|income/i.test(txn.description)
-          ? { ...txn, amount: value }
-          : txn,
-      ),
-    }))
-  }, [])
+  const setMonthlyIncome = useCallback(
+    (amount) => {
+      const value = Math.max(0, Math.round(Number(amount) || 0))
+      setState((prev) => ({
+        ...prev,
+        profile: { ...prev.profile, monthlyIncome: value },
+        transactions: prev.transactions.map((txn) =>
+          txn.amount > 0 && /salary|payroll|income/i.test(txn.description)
+            ? { ...txn, amount: value }
+            : txn,
+        ),
+      }))
+      if (session?.isFirebaseUser && session?.uid) {
+        updateProfileFirestore(session.uid, { monthlyIncome: value }).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const setOpeningBalance = useCallback(
+    (amount) => {
+      const value = Math.max(0, Math.round(Number(amount) || 0))
+      setState((prev) => ({
+        ...prev,
+        profile: { ...prev.profile, openingBalance: value },
+      }))
+      if (session?.isFirebaseUser && session?.uid) {
+        updateProfileFirestore(session.uid, { openingBalance: value }).catch(console.error)
+      }
+    },
+    [session?.isFirebaseUser, session?.uid],
+  )
+
+  const addRecurring = useCallback(
+    async (rule) => {
+      const created = await addRecurringRuleService(session?.uid, rule)
+      setRecurringRules((prev) => [created, ...prev.filter((r) => r.id !== created.id)])
+      pushToast({
+        title: 'Schedule Created',
+        body: `Recurring schedule for ${rule.title} active.`,
+        tone: 'emerald',
+      })
+      return created
+    },
+    [session?.uid, pushToast],
+  )
+
+  const updateRecurring = useCallback(
+    async (id, patch) => {
+      await updateRecurringRuleService(session?.uid, id, patch)
+      setRecurringRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    },
+    [session?.uid],
+  )
+
+  const deleteRecurring = useCallback(
+    async (id) => {
+      await deleteRecurringRuleService(session?.uid, id)
+      setRecurringRules((prev) => prev.filter((r) => r.id !== id))
+      pushToast({
+        title: 'Schedule Removed',
+        body: 'Recurring transaction schedule deleted.',
+        tone: 'slate',
+      })
+    },
+    [session?.uid, pushToast],
+  )
+
+  const processDueRecurringManually = useCallback(async () => {
+    const { transactionsToCreate, updatedRules } = evaluateDueRecurringRules(recurringRules)
+    if (transactionsToCreate.length > 0) {
+      addTransactionsBatch(transactionsToCreate)
+      for (const rule of updatedRules) {
+        await updateRecurringRuleService(session?.uid, rule.id, {
+          lastRunDate: rule.lastRunDate,
+          nextRunDate: rule.nextRunDate,
+        })
+      }
+      setRecurringRules((prev) =>
+        prev.map((r) => {
+          const match = updatedRules.find((u) => u.id === r.id)
+          return match ? { ...r, ...match } : r
+        }),
+      )
+      pushToast({
+        title: 'Processed Due Schedules ⚡',
+        body: `Recorded ${transactionsToCreate.length} automated transactions.`,
+        tone: 'emerald',
+      })
+    } else {
+      pushToast({
+        title: 'All Schedules Up to Date',
+        body: 'No pending recurring transactions are due today.',
+        tone: 'sky',
+      })
+    }
+  }, [recurringRules, addTransactionsBatch, session?.uid, pushToast])
 
   const markNotificationsRead = useCallback((id) => {
     setState((prev) => ({
@@ -292,9 +700,28 @@ export function AppProvider({ children }) {
     setState((prev) => ({ ...prev, sidebarCollapsed: !prev.sidebarCollapsed }))
   }, [])
 
-  const resetDemoData = useCallback(() => {
-    setState({ ...INITIAL_STATE })
-  }, [])
+  const resetAllUserData = useCallback(async () => {
+    setState({
+      ...INITIAL_STATE,
+      transactions: [],
+      loans: [],
+      budgets: DEFAULT_BUDGETS,
+      profile: {
+        ...INITIAL_STATE.profile,
+        monthlyIncome: 0,
+        emergencyFund: 0,
+        debtToIncome: 0,
+      },
+    })
+    try {
+      window.localStorage.removeItem(STORAGE_KEY)
+    } catch {}
+    if (session?.isFirebaseUser && session?.uid) {
+      await resetAllUserDataFirestore(session.uid)
+    }
+  }, [session?.isFirebaseUser, session?.uid])
+
+  const resetDemoData = resetAllUserData
 
   const openQuickAdd = useCallback(() => setQuickAddOpen(true), [])
   const closeQuickAdd = useCallback(() => setQuickAddOpen(false), [])
@@ -313,9 +740,10 @@ export function AppProvider({ children }) {
     const netSavings = totalIncome - totalExpenses
     const savingsRate = ratioPercent(netSavings, totalIncome)
 
-    /** Live balance = seeded balance + everything added since */
+    /** Live balance = user opening/starting bank balance + net transaction amounts */
+    const baseBalance = Number(profile.openingBalance) || 0
     const netNow = transactions.reduce((sum, t) => sum + t.amount, 0)
-    const balance = Math.round(BASE_BALANCE + (netNow - SEED_NET))
+    const balance = Math.round(baseBalance + netNow)
 
     /* per-category totals */
     const categoryTotals = CATEGORIES.reduce((acc, category) => {
@@ -367,11 +795,13 @@ export function AppProvider({ children }) {
       debtToIncome: profile.debtToIncome,
       monthlyExpenses: totalExpenses,
       emergencyFund: profile.emergencyFund,
+      hasTransactions: transactions.length > 0 || totalIncome > 0,
     })
 
-    /* 6-month series — September is always live */
-    const monthlySeries = MONTHLY_HISTORY.map((row) =>
-      row.short === 'Sep'
+    /* 6-month series — current month is dynamic and live */
+    const currentMonthShort = new Date().toLocaleDateString('en-US', { month: 'short' })
+    const monthlySeries = MONTHLY_HISTORY.map((row, idx) =>
+      row.short === currentMonthShort || idx === MONTHLY_HISTORY.length - 1
         ? { ...row, income: totalIncome, expenses: totalExpenses, savings: netSavings }
         : row,
     )
@@ -381,12 +811,15 @@ export function AppProvider({ children }) {
       return { month: row.short, saved: row.savings, cumulative: running }
     })
 
-    /* daily spend — every day of the demo month, up to the latest entry */
-    const monthPrefix = '2026-09'
-    const monthTxns = expenses.filter((t) => t.date.startsWith(monthPrefix))
+    /* daily spend — current month to today */
+    const now = new Date()
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthTxns = expenses.filter((t) => t.date && t.date.startsWith(monthPrefix))
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const currentDay = now.getDate()
     const lastDay = Math.max(
-      26,
-      ...monthTxns.map((t) => Number(t.date.slice(8, 10)) || 1),
+      currentDay,
+      ...monthTxns.map((t) => Number(t.date?.slice(8, 10)) || 1),
     )
     const dailySeries = Array.from({ length: lastDay }, (_, i) => {
       const day = i + 1
@@ -397,42 +830,43 @@ export function AppProvider({ children }) {
       return { label: String(day), full: formatShortDate(iso), amount }
     })
 
-    /* weekly buckets: 1-7, 8-14, 15-21, 22-28, 29+ */
+    /* weekly buckets for current month */
+    const monthShort = now.toLocaleDateString('en-US', { month: 'short' })
     const weeklySeries = [
-      { label: 'Week 1', range: '01 – 07 Sep' },
-      { label: 'Week 2', range: '08 – 14 Sep' },
-      { label: 'Week 3', range: '15 – 21 Sep' },
-      { label: 'Week 4', range: '22 – 28 Sep' },
-      { label: 'Week 5', range: '29 – 30 Sep' },
+      { label: 'Week 1', range: `01 – 07 ${monthShort}` },
+      { label: 'Week 2', range: `08 – 14 ${monthShort}` },
+      { label: 'Week 3', range: `15 – 21 ${monthShort}` },
+      { label: 'Week 4', range: `22 – 28 ${monthShort}` },
+      { label: 'Week 5', range: `29 – ${daysInMonth} ${monthShort}` },
     ].map((week, index) => {
       const start = index * 7 + 1
-      const end = index === 4 ? 30 : start + 6
+      const end = index === 4 ? daysInMonth : start + 6
       const amount = monthTxns
         .filter((t) => {
-          const day = Number(t.date.slice(8, 10))
+          const day = Number(t.date?.slice(8, 10))
           return day >= start && day <= end
         })
         .reduce((sum, t) => sum + Math.abs(t.amount), 0)
       return { ...week, amount }
     })
 
+    const prevBalance = BALANCE_TREND[4]?.value ?? 0
     const deltas = {
       balance: {
-        value: ratioPercent(balance - BALANCE_TREND[4].value, BALANCE_TREND[4].value),
-        direction: balance >= BALANCE_TREND[4].value ? 'up' : 'down',
+        value: prevBalance > 0 ? ratioPercent(balance - prevBalance, prevBalance) : 0,
+        direction: balance >= prevBalance ? 'up' : 'down',
       },
       income: {
-        value: ratioPercent(totalIncome - 43000, 43000),
-        direction: totalIncome >= 43000 ? 'up' : 'down',
+        value: 0,
+        direction: 'neutral',
       },
       expenses: {
-        value: ratioPercent(totalExpenses - 30000, 30000),
-        direction: totalExpenses >= 30000 ? 'up' : 'down',
+        value: 0,
+        direction: 'neutral',
       },
-      // Spec-mandated dashboard figure for the savings card
       savings: {
-        value: STAT_DELTAS.savings.value,
-        direction: 'up',
+        value: 0,
+        direction: 'neutral',
       },
     }
 
@@ -485,10 +919,16 @@ export function AppProvider({ children }) {
       pushToast,
       dismissToast,
       addTransaction,
+      addTransactionsBatch,
+      updateTransaction,
       deleteTransaction,
+      deleteTransactionsBatch,
+      deleteTransactionsByAmount,
+      deleteTransactionsByDescription,
       updateBudgets,
       updateProfile,
       setMonthlyIncome,
+      setOpeningBalance,
       addLoan,
       updateLoan,
       deleteLoan,
@@ -500,6 +940,16 @@ export function AppProvider({ children }) {
       setTheme,
       toggleSidebar,
       resetDemoData,
+      isFirebaseConfigured,
+      recurringRules,
+      recurringModalOpen,
+      setRecurringModalOpen,
+      openRecurringModal: () => setRecurringModalOpen(true),
+      closeRecurringModal: () => setRecurringModalOpen(false),
+      addRecurring,
+      updateRecurring,
+      deleteRecurring,
+      processDueRecurringManually,
     }),
     [
       state,
@@ -516,10 +966,16 @@ export function AppProvider({ children }) {
       pushToast,
       dismissToast,
       addTransaction,
+      addTransactionsBatch,
+      updateTransaction,
       deleteTransaction,
+      deleteTransactionsBatch,
+      deleteTransactionsByAmount,
+      deleteTransactionsByDescription,
       updateBudgets,
       updateProfile,
       setMonthlyIncome,
+      setOpeningBalance,
       addLoan,
       updateLoan,
       deleteLoan,
@@ -531,6 +987,12 @@ export function AppProvider({ children }) {
       setTheme,
       toggleSidebar,
       resetDemoData,
+      recurringRules,
+      recurringModalOpen,
+      addRecurring,
+      updateRecurring,
+      deleteRecurring,
+      processDueRecurringManually,
     ],
   )
 

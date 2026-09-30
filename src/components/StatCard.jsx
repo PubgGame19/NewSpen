@@ -39,6 +39,7 @@ export default function StatCard({
   spark,
   invertDelta = false,
   className = '',
+  action,
 }) {
   const theme = TONES[tone] || TONES.emerald
   const positive = (delta ?? 0) >= 0
@@ -50,7 +51,10 @@ export default function StatCard({
       className={`card card-hover card-pad animate-rise ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="eyebrow">{label}</p>
+        <div className="flex items-center gap-2">
+          <p className="eyebrow">{label}</p>
+          {action}
+        </div>
         {Icon ? (
           <span
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${theme.chip}`}
