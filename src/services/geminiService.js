@@ -6,12 +6,20 @@
  * ------------------------------------------------------------------
  */
 
-import { generateSmartFinancialResponse } from './smartAdvisor'
+import { generateSmartFinancialResponse } from './smartAdvisor.js'
 
 const GEMINI_LOCAL_KEY = 'spenance.gemini.key'
-const DEFAULT_MODEL = 'gemini-1.5-flash'
-const FALLBACK_MODEL = 'gemini-1.5-pro'
-const NEXT_GEN_MODEL = 'gemini-2.0-flash'
+const DEFAULT_MODEL = 'gemini-3.5-flash'
+const FALLBACK_MODEL = 'gemini-3.7-flash'
+const NEXT_GEN_MODEL = 'gemini-3.8-flash'
+const LATEST_FLASH_MODEL = 'gemini-flash-latest'
+
+const ACTIVE_CANDIDATE_MODELS = [
+  DEFAULT_MODEL,
+  FALLBACK_MODEL,
+  NEXT_GEN_MODEL,
+  LATEST_FLASH_MODEL,
+]
 
 /**
  * Returns the currently configured Gemini API Key from .env or localStorage.
@@ -21,7 +29,7 @@ export function getGeminiApiKey() {
     const custom = window.localStorage.getItem(GEMINI_LOCAL_KEY)
     if (custom && custom.trim().length > 10) return custom.trim()
   }
-  return (import.meta.env.VITE_GEMINI_API_KEY || '').trim()
+  return ((typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '').trim()
 }
 
 /**
@@ -69,6 +77,7 @@ export async function testGeminiApiKey(candidateKey) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined,
     })
 
     if (!res.ok) {
@@ -186,14 +195,15 @@ export async function askGeminiFinancialAdvisor(userQuestion, financialContext) 
       },
     }
 
-    // Try Gemini models in order of speed and capability
-    for (const model of [DEFAULT_MODEL, NEXT_GEN_MODEL, FALLBACK_MODEL]) {
+    // Try active Gemini models in order of speed and availability
+    for (const model of ACTIVE_CANDIDATE_MODELS) {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
         })
 
         if (!response.ok) {
@@ -209,7 +219,7 @@ export async function askGeminiFinancialAdvisor(userQuestion, financialContext) 
           return parseGeminiResponse(rawText)
         }
       } catch (err) {
-        console.warn(`Gemini [${model}] request failed:`, err)
+        console.warn(`Gemini [${model}] request failed:`, err.message || err)
       }
     }
   }
