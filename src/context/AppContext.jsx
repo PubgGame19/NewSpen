@@ -88,7 +88,12 @@ function loadState() {
       Array.from({ length: 30 }, (_, i) => `txn-${String(i + 1).padStart(2, '0')}`)
     )
     const cleanTxns = Array.isArray(parsed.transactions)
-      ? parsed.transactions.filter((t) => !mockTxnIds.has(t.id))
+      ? parsed.transactions.filter(
+          (t) =>
+            !mockTxnIds.has(t.id) &&
+            t.id !== 'tx_salary_init' &&
+            !t.id?.startsWith('income-salary-'),
+        )
       : []
     const cleanLoans = Array.isArray(parsed.loans)
       ? parsed.loans.filter((l) => l.id !== 'loan-edu' && l.id !== 'loan-personal')
@@ -210,7 +215,12 @@ export function AppProvider({ children }) {
       },
       onTransactions: (txns) => {
         if (Array.isArray(txns)) {
-          const clean = txns.filter((t) => !mockTxnIds.has(t.id))
+          const clean = txns.filter(
+            (t) =>
+              !mockTxnIds.has(t.id) &&
+              t.id !== 'tx_salary_init' &&
+              !t.id?.startsWith('income-salary-'),
+          )
           setState((prev) => ({ ...prev, transactions: clean }))
         }
       },
@@ -584,48 +594,20 @@ export function AppProvider({ children }) {
   )
 
   /**
-   * Changing the salary keeps the whole app coherent: the income credit is
-   * re-written so cash-flow, savings rate and score all follow the new figure.
+   * Updates monthly income in the user profile.
+   * Total income, savings, savings rate, cash flow charts, and score automatically derive from this.
    */
   const setMonthlyIncome = useCallback(
     (amount) => {
       const value = Math.max(0, Math.round(Number(amount) || 0))
       setState((prev) => {
-        const hasSalary = prev.transactions.some(
-          (t) => t.amount > 0 && /salary|payroll|income/i.test(t.description),
+        const cleanedTransactions = prev.transactions.filter(
+          (t) => t.id !== 'tx_salary_init' && !t.id?.startsWith('income-salary-'),
         )
-
-        let nextTxns
-        if (hasSalary) {
-          nextTxns = prev.transactions.map((txn) =>
-            txn.amount > 0 && /salary|payroll|income/i.test(txn.description)
-              ? { ...txn, amount: value }
-              : txn,
-          )
-        } else if (value > 0) {
-          const now = new Date()
-          const salaryTxn = {
-            id: `income-salary-${Date.now()}`,
-            description: 'Monthly Salary Credit',
-            category: 'Salary',
-            amount: value,
-            date: now.toISOString().slice(0, 10),
-            time: '09:00',
-            method: 'Bank Transfer',
-            merchant: 'Employer Payroll',
-          }
-          nextTxns = [salaryTxn, ...prev.transactions]
-          if (session?.isFirebaseUser && session?.uid) {
-            addTransactionFirestore(session.uid, salaryTxn).catch(console.error)
-          }
-        } else {
-          nextTxns = prev.transactions
-        }
-
         return {
           ...prev,
           profile: { ...prev.profile, monthlyIncome: value },
-          transactions: nextTxns,
+          transactions: cleanedTransactions,
         }
       })
       if (session?.isFirebaseUser && session?.uid) {
@@ -635,9 +617,12 @@ export function AppProvider({ children }) {
     [session?.isFirebaseUser, session?.uid],
   )
 
+  /**
+   * Sets the user's base opening balance (bank/cash/wallets).
+   */
   const setOpeningBalance = useCallback(
     (amount) => {
-      const value = Math.max(0, Math.round(Number(amount) || 0))
+      const value = Math.round(Number(amount) || 0)
       setState((prev) => ({
         ...prev,
         profile: { ...prev.profile, openingBalance: value },

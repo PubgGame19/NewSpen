@@ -116,19 +116,22 @@ export default function Dashboard() {
   const [draftIncome, setDraftIncome] = useState('')
 
   const openBalanceModal = () => {
-    setDraftBalance(balance ? String(balance) : (profile.openingBalance ? String(profile.openingBalance) : ''))
+    setDraftBalance(balance !== undefined && balance !== null ? String(balance) : '')
     setEditBalanceOpen(true)
   }
 
   const openIncomeModal = () => {
-    setDraftIncome(totalIncome ? String(totalIncome) : (profile.monthlyIncome ? String(profile.monthlyIncome) : ''))
+    const currentIncome = profile.monthlyIncome || totalIncome || ''
+    setDraftIncome(currentIncome ? String(currentIncome) : '')
     setEditIncomeOpen(true)
   }
 
   const handleSaveBalance = (e) => {
     e?.preventDefault()
-    const targetBalance = Math.max(0, Math.round(Number(String(draftBalance).replace(/,/g, '')) || 0))
-    const netTransactions = transactions.reduce((sum, t) => sum + t.amount, 0)
+    const targetBalance = Math.round(Number(String(draftBalance).replace(/,/g, '')) || 0)
+    const netTransactions = transactions
+      .filter((t) => t.id !== 'tx_salary_init' && !t.id?.startsWith('income-salary-'))
+      .reduce((sum, t) => sum + t.amount, 0)
     setOpeningBalance(targetBalance - netTransactions)
     setEditBalanceOpen(false)
     pushToast({
@@ -734,7 +737,13 @@ export default function Dashboard() {
             <Button variant="ghost" onClick={() => setEditBalanceOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={Check} type="submit" form="edit-balance-form">
+            <Button
+              variant="primary"
+              icon={Check}
+              type="submit"
+              form="edit-balance-form"
+              onClick={handleSaveBalance}
+            >
               Save Balance
             </Button>
           </>
@@ -757,6 +766,7 @@ export default function Dashboard() {
                 autoFocus
                 placeholder="e.g. 50000"
                 value={draftBalance}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setDraftBalance(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="input tabular pl-8 text-base font-bold"
               />
@@ -780,7 +790,13 @@ export default function Dashboard() {
             <Button variant="ghost" onClick={() => setEditIncomeOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={Check} type="submit" form="edit-income-form">
+            <Button
+              variant="primary"
+              icon={Check}
+              type="submit"
+              form="edit-income-form"
+              onClick={handleSaveIncome}
+            >
               Save Income
             </Button>
           </>
@@ -803,6 +819,7 @@ export default function Dashboard() {
                 autoFocus
                 placeholder="e.g. 75000"
                 value={draftIncome}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setDraftIncome(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="input tabular pl-8 text-base font-bold"
               />
