@@ -496,6 +496,7 @@ ${budgetRemaining > 0 ? `You still have **${formatINR(budgetRemaining)}** remain
     return {
       response: `Main aapka personal finance advisor hoon! 
 Aap mujhse kisi bhi financial topic par pooch sakte ho:
+
 - **Affordability:** *"Bhai kya main 40k ka phone le sakta hu?"*
 - **Budgeting:** *"50/30/20 rule kya hai aur paise kaise bachau?"*
 - **Investing:** *"SIP me invest karu ya bank FD me?"*
@@ -511,6 +512,7 @@ Aap mujhse kisi bhi financial topic par pooch sakte ho:
 
   return {
     response: `I am your personal financial advisor! You can ask me any question about your wealth and spending:
+
 - **Affordability:** *"Can I afford a new gadget of ₹45,000?"*
 - **Budgeting:** *"How do I implement the 50/30/20 framework?"*
 - **Investing:** *"Should I choose an Equity SIP or Bank FD?"*

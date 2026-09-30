@@ -1,9 +1,77 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CornerDownLeft, RotateCcw, Send, Sparkles, UserRound, Zap } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { AI_FALLBACK, AI_KNOWLEDGE, AI_SUGGESTED_QUESTIONS } from '../data/mockData'
 import { useApp } from '../context/AppContext'
 import { askGeminiFinancialAdvisor, isGeminiConfigured } from '../services/geminiService'
 import Button from './ui/Button'
+
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }) => (
+    <p className="mb-2.5 last:mb-0 leading-relaxed text-[13px]">{children}</p>
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold text-slate-900 dark:text-white">
+      {children}
+    </strong>
+  ),
+  em: ({ children }) => (
+    <em className="italic text-slate-600 dark:text-slate-300">{children}</em>
+  ),
+  ul: ({ children }) => (
+    <ul className="my-2 ml-4 list-disc space-y-1.5 marker:text-emerald-500">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-2 ml-4 list-decimal space-y-1.5 marker:font-semibold marker:text-emerald-600 dark:marker:text-emerald-400">
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => (
+    <li className="text-[13px] leading-relaxed pl-0.5">{children}</li>
+  ),
+  h1: ({ children }) => (
+    <h1 className="mt-3 mb-1.5 text-[15px] font-bold text-slate-900 dark:text-white">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="mt-2.5 mb-1 text-[14px] font-bold text-slate-900 dark:text-white">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="mt-2 mb-1 text-[13px] font-bold text-slate-900 dark:text-white">
+      {children}
+    </h3>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 rounded-r-lg border-l-2 border-emerald-500 bg-emerald-50/50 py-1.5 pl-3 pr-2 text-slate-700 italic dark:bg-emerald-950/20 dark:text-slate-300">
+      {children}
+    </blockquote>
+  ),
+  code: ({ inline, children }) =>
+    inline ? (
+      <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11.5px] font-medium text-emerald-600 dark:bg-slate-800 dark:text-emerald-400">
+        {children}
+      </code>
+    ) : (
+      <pre className="my-2 overflow-x-auto rounded-xl bg-slate-900 p-3 font-mono text-[12px] text-slate-100 dark:bg-slate-950">
+        <code>{children}</code>
+      </pre>
+    ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-500 dark:text-emerald-400"
+    >
+      {children}
+    </a>
+  ),
+}
 
 function now() {
   return new Date().toLocaleTimeString('en-IN', {
@@ -193,7 +261,15 @@ export default function AIChat() {
                       : 'bg-emerald-600 text-white shadow-sm'
                   }`}
                 >
-                  <p>{message.text}</p>
+                  {isAI ? (
+                    <div className="chat-markdown">
+                      <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+                        {message.text}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{message.text}</p>
+                  )}
 
                   {message.highlights?.length ? (
                     <ul className="mt-2.5 space-y-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
