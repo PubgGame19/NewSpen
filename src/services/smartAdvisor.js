@@ -7,6 +7,8 @@
  * ------------------------------------------------------------------
  */
 
+import { AI_KNOWLEDGE } from '../data/mockData.js'
+
 function formatINR(val) {
   const num = Math.round(val || 0)
   return '₹' + num.toLocaleString('en-IN')
@@ -66,6 +68,8 @@ export function generateSmartFinancialResponse(question = '', ctx = {}) {
   const hasData = transactions.length > 0 || totalIncome > 0 || totalExpenses > 0 || balance > 0
   const activeLoans = loans.filter((l) => l.status !== 'Closed')
   const targetAmount = parseTargetAmount(text)
+  const cleanSavingsRate = Number((savingsRate || 0).toFixed(1))
+  const cleanBudgetUsage = Number((budgetUsagePercent || 0).toFixed(1))
 
   // =========================================================================
   // 1. CASUAL GREETINGS & INTRO ("Hi", "Hello", "Kaise ho", "Bhai", etc.)
@@ -413,9 +417,170 @@ You can comfortably afford this purchase if you meet three criteria:
   }
 
   // =========================================================================
-  // 7. USER SPENDING / PORTFOLIO BREAKDOWN (When asking about their numbers)
+  // 7. FINANCIAL HEALTH & SCORE ("How is my financial health?", "score", "rating")
   // =========================================================================
-  if (/where.*spending|kharcha.*kaha|mera paisa|highest.*expense|breakdown|category/i.test(text)) {
+  if (/financial health|health|score|rating|fitness|kaise hai meri health|meri financial condition|how am i doing/i.test(text)) {
+    const totalScore = score?.total ?? 85
+    const scoreCategory = totalScore >= 80 ? 'Excellent' : totalScore >= 60 ? 'Healthy' : 'Needs Attention'
+
+    return {
+      response: hinglish
+        ? `**Aapka Financial Health Score: ${totalScore}/100 (${scoreCategory})**
+
+Aapki financial fitness in 3 pillars par bani hai:
+1. **Savings Discipline:** Aapki monthly savings **${formatINR(netSavings)}** hai (**${cleanSavingsRate}% savings rate**). Benchmark kam se kam 20% hona chahiye.
+2. **Budget Control:** Aapne monthly budget ka **${cleanBudgetUsage}%** use kiya hai, aur abhi bhi **${formatINR(budgetRemaining)}** bacha hua hai.
+3. **Debt Management:** Aapke paas **${activeLoans.length} active loan(s)** hain (Monthly EMI: **${formatINR(emiTotal)}**). ${activeLoans.length === 0 ? 'Aap bilkul debt-free hain! 🎉' : ''}
+
+💡 **Actionable Tip:** Har mahine salary aate hi pehle 20% SIP me automate karein aur bache hue budget buffer ko strictly monitor karein!`
+        : `**Your Live Financial Health Score: ${totalScore}/100 (${scoreCategory})**
+
+Your overall fitness is evaluated across 3 core financial pillars:
+1. **Savings Discipline:** You are saving **${cleanSavingsRate}%** of your monthly income (**${formatINR(netSavings)}/month** net surplus). Recommended baseline is at least 20%.
+2. **Budget Control:** You have utilized **${cleanBudgetUsage}%** of your allocated budget, retaining **${formatINR(budgetRemaining)}** in safety headroom.
+3. **Debt Management:** You have **${activeLoans.length} active loan(s)** totaling **${formatINR(emiTotal)}** in monthly EMI outflow. ${activeLoans.length === 0 ? 'You are 100% debt-free!' : ''}
+
+💡 **Actionable Tip:** Aim to maintain your score above 80 by continuing automated monthly SIPs and keeping credit utilization below 30%.`,
+      highlights: [
+        `Overall Score: ${totalScore}/100 (${scoreCategory})`,
+        `Savings Rate: ${cleanSavingsRate}% (${formatINR(netSavings)}/mo)`,
+        `Budget Buffer: ${formatINR(budgetRemaining)}`,
+      ],
+    }
+  }
+
+  // =========================================================================
+  // 8. MONTHLY SAVINGS TARGET & BENCHMARKS ("How much should I save every month?")
+  // =========================================================================
+  if (/how much.*save|save.*every month|kitna.*save|kitna.*bachau|monthly.*savings.*target|ideal.*saving|target.*saving|how much should/i.test(text)) {
+    const incomeRef = totalIncome > 0 ? totalIncome : 50000
+    const target20 = Math.round(incomeRef * 0.2)
+    const target30 = Math.round(incomeRef * 0.3)
+
+    return {
+      response: hinglish
+        ? `**Har Mahine Kitna Save Karna Chahiye?**
+
+Monthly income **${formatINR(incomeRef)}** ke hisaab se recommended savings benchmarks:
+- **Baseline Target (20%):** Kam se kam **${formatINR(target20)}/month** bacha kar emergency fund aur Index SIPs me dalein.
+- **Aggressive Wealth Target (30%):** **${formatINR(target30)}/month** bachaayein agar jaldi financial independence chahte hain.
+
+**Aapka Live Status:**
+- Aap is waqt **${formatINR(netSavings)} (${cleanSavingsRate}%)** save kar rahe hain.
+${cleanSavingsRate >= 20 ? '✅ **Badhiya!** Aapka current savings rate 20% benchmark se aage chal raha hai!' : '💡 **Opportunity:** Discretionary shopping thoda kam karke 20% target achieve karein.'}`
+        : `**Recommended Monthly Savings Benchmark:**
+
+Benchmarked against your monthly income of **${formatINR(incomeRef)}**, here are target savings benchmarks:
+- **Essential Baseline (20% Target):** Deploy at least **${formatINR(target20)}/month** into liquid savings and broad-market index investments.
+- **Accelerated Wealth Building (30% Target):** Aim for **${formatINR(target30)}/month** to achieve early financial independence.
+
+**Your Current Performance:**
+- Current Net Savings: **${formatINR(netSavings)}/month** (${cleanSavingsRate}% savings rate).
+${cleanSavingsRate >= 20 ? '✅ **Excellent:** Your current savings rate already beats the recommended 20% benchmark!' : '💡 **Opportunity:** Optimize non-essential spending to reach the 20% savings threshold.'}`,
+      highlights: [
+        `Baseline (20% Target): ${formatINR(target20)}/month`,
+        `Aggressive (30% Target): ${formatINR(target30)}/month`,
+        `Your Current Savings: ${formatINR(netSavings)} (${cleanSavingsRate}%)`,
+      ],
+    }
+  }
+
+  // =========================================================================
+  // 9. BUDGET STATUS & ON TRACK ("Is my budget still on track?", "budget status")
+  // =========================================================================
+  if (/budget.*track|budget.*status|budget.*on track|is my budget|budget.*remaining|track/i.test(text)) {
+    const isOver = cleanBudgetUsage > 100
+    const isWarning = cleanBudgetUsage >= 85 && !isOver
+
+    return {
+      response: hinglish
+        ? `**Aapka Live Budget Status:**
+
+- **Total Allocated Budget:** **${formatINR(budgetTotal)}**
+- **Ab Tak Ka Kharcha:** **${formatINR(totalExpenses)} (${cleanBudgetUsage}%)**
+- **Remaining Buffer:** **${formatINR(budgetRemaining)}**
+
+${isOver ? '⚠️ **Alert:** Aapka kharcha allocated budget se zyada ho chuka hai! Discretionary shopping aur dining out par pause lagayein.' : isWarning ? '⚡ **Warning:** Aap budget ke 85% se upar pahunch chuke hain. Mahine ke bache hue dino me alert rahein.' : '✅ **On Track:** Aapka budget bilkul control me hai aur spending pacing healthy hai!'}`
+        : `**Your Live Budget Status & Health:**
+
+- **Total Allocated Budget:** **${formatINR(budgetTotal)}**
+- **Utilized So Far:** **${formatINR(totalExpenses)} (${cleanBudgetUsage}%)**
+- **Remaining Headroom:** **${formatINR(budgetRemaining)}**
+
+${isOver ? '⚠️ **Over Budget Alert:** Current spending has exceeded allocated limits. Pause non-essential purchases to prevent cash deficits.' : isWarning ? '⚡ **Pacing Warning:** You have consumed over 85% of your budget envelopes with days remaining in the billing cycle.' : '✅ **On Track:** Your spending pacing is disciplined and well within safe operational envelopes.'}`,
+      highlights: [
+        `Budget Allocated: ${formatINR(budgetTotal)}`,
+        `Remaining Buffer: ${formatINR(budgetRemaining)}`,
+        `Usage Rate: ${cleanBudgetUsage}%`,
+      ],
+    }
+  }
+
+  // =========================================================================
+  // 10. WHERE TO CUT SPENDING ("Where can I cut spending?", "cut expenses")
+  // =========================================================================
+  if (/cut.*spend|cut.*expense|reduce.*expense|kam.*kharcha|kharcha.*kam|save.*more|cut.*cost|cut/i.test(text)) {
+    const sortedCategories = [...categoryRows].sort((a, b) => (b.spent || 0) - (a.spent || 0))
+    const topDiscretionary = sortedCategories.find((c) => /food|dining|shopping|entertainment|lifestyle|leisure|travel/i.test(c.category)) || sortedCategories[0]
+
+    return {
+      response: hinglish
+        ? `**Kharche Kahan Kam Kiye Jaa Sakte Hain?**
+
+1. **Top Expense Envelope:**
+   - Aapka sabse bada variable kharcha **${topDiscretionary?.category || 'Dining & Shopping'}** me ho raha hai (**${formatINR(topDiscretionary?.spent || 0)}**). Yahan 10–15% cut karne se seedha **${formatINR((topDiscretionary?.spent || 20000) * 0.15)}** ki bachat hogi.
+2. **Subscriptions Audit:**
+   - Unused OTT, gym, ya cloud subscriptions cancel karein. Outside dining ko mahine me 2 baar kam karne se instant bachat hoti hai.
+3. **The 48-Hour Cooling Off Rule:**
+   - Kisi bhi non-essential item par swipe karne se pehle 48 ghante wait karein. 70% impulse purchases automatically eliminate ho jaate hain.`
+        : `**Strategic Spending Optimization Blueprint:**
+
+1. **Target Highest Variable Envelopes:**
+   - Your primary target for quick optimization is **${topDiscretionary?.category || 'Food & Dining'}** (currently at **${formatINR(topDiscretionary?.spent || 0)}**). Trimming 15% recovers **${formatINR((topDiscretionary?.spent || 20000) * 0.15)}** immediately.
+2. **Subscription & Recurring Drain Audit:**
+   - Review unused memberships, streaming platforms, and recurring digital charges under Recurring Rules.
+3. **Deploy the 48-Hour Cooling-Off Rule:**
+   - Introduce a mandatory 48-hour delay on discretionary purchases over ₹2,000 to eliminate emotional impulse buys.`,
+      highlights: [
+        `Optimize: ${topDiscretionary?.category || 'Variable Spends'} (${formatINR(topDiscretionary?.spent || 0)})`,
+        'Apply 48-hour cooling rule on wants',
+        'Redirect recovered savings into Index SIPs',
+      ],
+    }
+  }
+
+  // =========================================================================
+  // 11. LONG-TERM TRENDS & INSIGHTS ("Show my long-term trends", "trends", "insights")
+  // =========================================================================
+  if (/trend|long.*term|trajectory|growth|future.*wealth|insight/i.test(text)) {
+    const futureCompounding5yr = Math.round(netSavings * 82)
+
+    return {
+      response: hinglish
+        ? `**Long-term Wealth Trends & Compounding Forecast:**
+
+- **Net Cash Retention:** Aap apni income ka **${cleanSavingsRate}%** retain kar rahe hain (**${formatINR(netSavings)}/month**).
+- **5-Year SIP Compounding Power:**
+  Agar aap apni monthly savings (**${formatINR(netSavings)}**) ko Nifty 50 Index Fund me 12% p.a. return par consistently invest karte hain, to 5 saal baad aapka portfolio lagbhag **${formatINR(futureCompounding5yr)}** ban sakta hai!
+- **Step-Up Strategy:** Har saal salary increment ke sath apni monthly SIP ko 10% badhayein.`
+        : `**Long-term Wealth Trajectory & Compounding Forecast:**
+
+- **Capital Retention:** You are currently retaining **${cleanSavingsRate}%** of monthly income (**${formatINR(netSavings)}/month** net surplus).
+- **5-Year Compounding Projection:**
+  Deploying your monthly net surplus of **${formatINR(netSavings)}** into an index fund averaging a historical 12% CAGR projects an accumulated corpus of approximately **${formatINR(futureCompounding5yr)}** in 5 years.
+- **Accelerate via Step-up:** Increasing your monthly investment by 10% annually dramatically compresses your timeline to financial independence.`,
+      highlights: [
+        `Monthly Wealth Engine: ${formatINR(netSavings)}/month`,
+        `5-Year Projected Value: ~${formatINR(futureCompounding5yr)}`,
+        'Step up investment by 10% annually',
+      ],
+    }
+  }
+
+  // =========================================================================
+  // 12. USER SPENDING / PORTFOLIO BREAKDOWN ("Analyze my spending", "where am i spending")
+  // =========================================================================
+  if (/where.*spend|spend.*most|kharcha.*kaha|mera paisa|highest.*expense|breakdown|category|analy[sz]e.*spend|spend.*analy[sz]e|spend.*pattern|analy[sz]e|spending/i.test(text)) {
     if (!hasData) {
       return {
         response: hinglish
@@ -438,11 +603,13 @@ Once you log your transactions or import a bank statement CSV, I will generate a
     return {
       response: hinglish
         ? `**Aapka Live Spending Breakdown:**
+
 Is mahine aapka total kharcha **${formatINR(totalExpenses)}** raha hai (${transactions.length} transactions me).
 - **Sabse bada kharcha:** **${topCategory?.category || 'None'}** me **${formatINR(topCategory?.spent || 0)}** खर्च hua hai.
 ${secondCategory ? `- **Doosra bada kharcha:** **${secondCategory.category}** me **${formatINR(secondCategory.spent)}**.` : ''}
 ${budgetRemaining > 0 ? `Aapke paas monthly budget me abhi **${formatINR(budgetRemaining)}** bache hue hain.` : ''}`
         : `**Your Live Spending Analysis:**
+
 Total monthly outflow stands at **${formatINR(totalExpenses)}** across **${transactions.length} transactions**.
 - **Largest expense envelope:** **${topCategory?.category || 'None'}** at **${formatINR(topCategory?.spent || 0)}**.
 ${secondCategory ? `- **Second largest:** **${secondCategory.category}** at **${formatINR(secondCategory.spent)}**.` : ''}
@@ -456,7 +623,7 @@ ${budgetRemaining > 0 ? `You still have **${formatINR(budgetRemaining)}** remain
   }
 
   // =========================================================================
-  // 8. LOANS & DEBT (When asking about loans/EMIs)
+  // 13. LOANS & DEBT (When asking about loans/EMIs)
   // =========================================================================
   if (/loan|emi|karza|udhar|debt|prepay|avalanche/i.test(text)) {
     if (activeLoans.length === 0) {
@@ -478,8 +645,10 @@ ${budgetRemaining > 0 ? `You still have **${formatINR(budgetRemaining)}** remain
     return {
       response: hinglish
         ? `Aapke paas **${activeLoans.length} active loan(s)** hain, jinki total outstanding **${formatINR(totalDebt)}** aur monthly EMI **${formatINR(emiTotal)}** hai.
+
 **Debt Avalanche Tip:** Sabse pehle **${highestRateLoan.name} (${highestRateLoan.interestRate}%)** ko prepay karein, kyunki iska interest rate sabse high hai!`
         : `You are servicing **${activeLoans.length} active loan(s)** with total outstanding of **${formatINR(totalDebt)}** and monthly EMIs of **${formatINR(emiTotal)}**.
+
 **Avalanche Priority:** Direct any surplus prepayments to **${highestRateLoan.name} (${highestRateLoan.interestRate}%)** first to save maximum interest.`,
       highlights: [
         `Total Debt: ${formatINR(totalDebt)}`,
@@ -490,7 +659,20 @@ ${budgetRemaining > 0 ? `You still have **${formatINR(budgetRemaining)}** remain
   }
 
   // =========================================================================
-  // 9. GENERAL ADVISOR FALLBACK
+  // 14. SECONDARY CATCH VIA AI_KNOWLEDGE BASE
+  // =========================================================================
+  const hit = AI_KNOWLEDGE.find((entry) =>
+    entry.keywords.some((keyword) => text.includes(keyword.toLowerCase())),
+  )
+  if (hit) {
+    return {
+      response: hit.response,
+      highlights: hit.highlights || [],
+    }
+  }
+
+  // =========================================================================
+  // 15. GENERAL ADVISOR FALLBACK
   // =========================================================================
   if (hinglish) {
     return {
