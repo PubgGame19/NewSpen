@@ -6,9 +6,12 @@
  * ------------------------------------------------------------------
  */
 
+import { generateSmartFinancialResponse } from './smartAdvisor'
+
 const GEMINI_LOCAL_KEY = 'spenance.gemini.key'
-const DEFAULT_MODEL = 'gemini-1.5-pro'
-const FALLBACK_MODEL = 'gemini-1.5-flash'
+const DEFAULT_MODEL = 'gemini-1.5-flash'
+const FALLBACK_MODEL = 'gemini-1.5-pro'
+const NEXT_GEN_MODEL = 'gemini-2.0-flash'
 
 /**
  * Returns the currently configured Gemini API Key from .env or localStorage.
@@ -160,66 +163,62 @@ INSTRUCTIONS:
 }
 
 /**
- * Sends a query with the user's live financial context to the Gemini API.
+ * Sends a query with the user's live financial context to the Gemini API,
+ * or falls back seamlessly to the smart built-in engine.
  */
 export async function askGeminiFinancialAdvisor(userQuestion, financialContext) {
   const apiKey = getGeminiApiKey()
-  if (!apiKey) {
-    throw new Error('GEMINI_KEY_MISSING')
-  }
 
-  const promptText = buildFinancialPrompt(financialContext, userQuestion)
+  // If Gemini API Key is configured, attempt calling Google Gemini
+  if (apiKey && apiKey.length > 15) {
+    const promptText = buildFinancialPrompt(financialContext, userQuestion)
 
-  const payload = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: promptText }],
+    const payload = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: promptText }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.65,
+        maxOutputTokens: 800,
       },
-    ],
-    generationConfig: {
-      temperature: 0.65,
-      maxOutputTokens: 800,
-    },
-  }
+    }
 
-  // Try Gemini 1.5 Pro first; fallback to Gemini 1.5 Flash if rate-limited or unavailable
-  for (const model of [DEFAULT_MODEL, FALLBACK_MODEL]) {
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+    // Try Gemini models in order of speed and capability
+    for (const model of [DEFAULT_MODEL, NEXT_GEN_MODEL, FALLBACK_MODEL]) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMsg = errorData.error?.message || `HTTP ${response.status}`
-        // If 404 or model not found, loop to next fallback model
-        if (response.status === 404 || errorMsg.includes('not found')) {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMsg = errorData.error?.message || `HTTP ${response.status}`
+          console.warn(`Gemini [${model}] responded with error:`, errorMsg)
           continue
         }
-        throw new Error(errorMsg)
-      }
 
-      const data = await response.json()
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
-      if (!rawText) {
-        throw new Error('Gemini returned an empty response. Please try again.')
-      }
-
-      // Parse response into main text and highlights
-      return parseGeminiResponse(rawText)
-    } catch (err) {
-      if (model === FALLBACK_MODEL) {
-        throw err
+        const data = await response.json()
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
+        if (rawText && rawText.trim().length > 0) {
+          return parseGeminiResponse(rawText)
+        }
+      } catch (err) {
+        console.warn(`Gemini [${model}] request failed:`, err)
       }
     }
   }
 
-  throw new Error('Unable to connect to Google Gemini API.')
+  // Seamless zero-latency fallback using live financial engine
+  return generateSmartFinancialResponse(userQuestion, financialContext)
 }
+
+export { generateSmartFinancialResponse }
 
 /**
  * Separates response text from bullet actionables

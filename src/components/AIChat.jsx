@@ -88,29 +88,19 @@ export default function AIChat() {
     }
 
     try {
-      if (isGeminiConfigured()) {
-        const result = await askGeminiFinancialAdvisor(question, financialContext)
-        pushChatMessage({
-          role: 'ai',
-          text: result.response,
-          highlights: result.highlights || [],
-          time: now(),
-        })
-      } else {
-        const fallback = answerFor(question)
-        pushChatMessage({
-          role: 'ai',
-          text: `${fallback.response}\n\n💡 Tip: Add your Google Gemini API key in Settings to unlock real-time Gemini Pro analysis!`,
-          highlights: fallback.highlights || [],
-          time: now(),
-        })
-      }
+      const result = await askGeminiFinancialAdvisor(question, financialContext)
+      pushChatMessage({
+        role: 'ai',
+        text: result.response,
+        highlights: result.highlights || [],
+        time: now(),
+      })
     } catch (err) {
-      console.warn('Gemini request notice:', err)
+      console.warn('AI advisor request notice:', err)
       const fallback = answerFor(question)
       pushChatMessage({
         role: 'ai',
-        text: `Analysis based on current balance (₹${balance.toLocaleString('en-IN')}) and ${transactions.length} transactions:\n\n${fallback.response}`,
+        text: `Analysis based on current balance (₹${balance.toLocaleString('en-IN')}):\n\n${fallback.response}`,
         highlights: fallback.highlights || [],
         time: now(),
       })
@@ -133,16 +123,21 @@ export default function AIChat() {
             {isGeminiConfigured() ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Gemini Pro
+                Gemini Cloud
               </span>
-            ) : null}
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] font-semibold text-teal-600 dark:text-teal-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
+                Smart Engine
+              </span>
+            )}
           </div>
           <p className="muted text-[11px] font-medium">
             {typing
-              ? 'Gemini is analyzing your live finances…'
+              ? 'Analyzing your live portfolio…'
               : isGeminiConfigured()
-                ? 'Powered by Google Gemini Pro'
-                : 'Online · Smart Assistant (Configure key in Settings)'}
+                ? 'Online · Powered by Google Gemini'
+                : 'Online · Live Financial Intelligence'}
           </p>
         </div>
         <Button

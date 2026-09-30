@@ -99,17 +99,20 @@ export default function AIConsultant() {
         <div className="flex flex-wrap items-center gap-2">
           {isGeminiConfigured() ? (
             <Badge tone="emerald" icon={Sparkles}>
-              Gemini 1.5 Pro Active
+              Gemini Cloud Active
             </Badge>
           ) : (
-            <Button
-              variant="outline"
-              icon={KeyRound}
-              onClick={() => navigate('/settings')}
-            >
-              Connect Gemini Pro
-            </Button>
+            <Badge tone="teal" icon={Sparkles}>
+              Smart Advisor Active
+            </Badge>
           )}
+          <Button
+            variant="outline"
+            icon={KeyRound}
+            onClick={() => navigate('/settings')}
+          >
+            {isGeminiConfigured() ? 'Manage API Key' : 'Connect Gemini API'}
+          </Button>
           <Button
             variant="ghost"
             icon={CreditCard}
