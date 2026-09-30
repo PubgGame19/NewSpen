@@ -34,6 +34,7 @@ import {
   loginWithEmail,
   registerWithEmail,
   loginWithGoogle,
+  checkRedirectAuth,
   sendResetPassword,
 } from '../services/firebaseService'
 
@@ -60,6 +61,19 @@ export default function Login() {
     document.title =
       mode === 'signup' ? 'Create Account · SPENANCE' : 'Sign In · SPENANCE'
   }, [mode])
+
+  useEffect(() => {
+    checkRedirectAuth().then((user) => {
+      if (user) {
+        pushToast({
+          title: 'Google Sign-In successful',
+          body: 'Synced your data with Firebase Firestore.',
+          tone: 'emerald',
+        })
+        navigate(redirectTo, { replace: true })
+      }
+    })
+  }, [])
 
   /* Already signed in — redirect */
   if (session) return <Navigate to={redirectTo} replace />
@@ -165,7 +179,13 @@ export default function Login() {
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user') {
         console.error('Google sign in error:', err)
-        setErrors((prev) => ({ ...prev, form: err.message || 'Google sign-in failed.' }))
+        let msg = err.message || 'Google sign-in failed.'
+        if (err.code === 'auth/popup-blocked') {
+          msg = 'Browser popup blocked. Please allow popups for this site in your browser URL bar, or click again to redirect.'
+        } else if (err.code === 'auth/unauthorized-domain') {
+          msg = 'Domain not authorized in Firebase Console. Please add this domain to Firebase Console -> Authentication -> Settings -> Authorized domains.'
+        }
+        setErrors((prev) => ({ ...prev, form: msg }))
       }
     } finally {
       setGoogleSubmitting(false)

@@ -2,6 +2,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   sendPasswordResetEmail,
   updateProfile as updateAuthProfile,
@@ -72,21 +74,53 @@ export async function loginWithGoogle() {
   if (!isFirebaseConfigured || !auth || !googleProvider) {
     throw new Error('Firebase Google Auth is not configured.')
   }
-  const userCredential = await signInWithPopup(auth, googleProvider)
-  const user = userCredential.user
+  try {
+    const userCredential = await signInWithPopup(auth, googleProvider)
+    const user = userCredential.user
 
-  // Check if profile exists, if not seed initial data
-  if (db) {
-    const userDoc = await getDoc(doc(db, 'users', user.uid))
-    if (!userDoc.exists()) {
-      await seedUserData(user.uid, {
-        name: user.displayName || user.email.split('@')[0],
-        email: user.email,
-      })
+    // Check if profile exists, if not seed initial data
+    if (db) {
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      if (!userDoc.exists()) {
+        await seedUserData(user.uid, {
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email,
+        })
+      }
     }
-  }
 
-  return user
+    return user
+  } catch (error) {
+    if (error.code === 'auth/popup-blocked') {
+      // Automatic fallback to redirect if popup blocker prevented the popup
+      await signInWithRedirect(auth, googleProvider)
+      return null
+    }
+    throw error
+  }
+}
+
+export async function checkRedirectAuth() {
+  if (!isFirebaseConfigured || !auth) return null
+  try {
+    const result = await getRedirectResult(auth)
+    if (result && result.user) {
+      const user = result.user
+      if (db) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid))
+        if (!userDoc.exists()) {
+          await seedUserData(user.uid, {
+            name: user.displayName || user.email.split('@')[0],
+            email: user.email,
+          })
+        }
+      }
+      return user
+    }
+  } catch (err) {
+    console.warn('Redirect auth check failed:', err)
+  }
+  return null
 }
 
 export async function logoutUser() {
