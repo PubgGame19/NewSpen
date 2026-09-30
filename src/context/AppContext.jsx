@@ -157,6 +157,17 @@ export function AppProvider({ children }) {
         writeSession(nextSession, true)
         setSession(nextSession)
         setJustSignedOut(false)
+        setState((prev) => ({
+          ...prev,
+          profile: {
+            ...prev.profile,
+            name: name || prev.profile.name,
+            firstName: name ? name.split(' ')[0] : prev.profile.firstName,
+            initials: initials || prev.profile.initials,
+            email: firebaseUser.email || prev.profile.email,
+            accountType: 'Firebase Cloud Account',
+          },
+        }))
       } else {
         setSession((prev) => {
           if (prev?.isFirebaseUser) {
@@ -263,6 +274,18 @@ export function AppProvider({ children }) {
     writeSession(nextSession, remember)
     setSession(nextSession)
     setJustSignedOut(false)
+    if (nextSession?.name) {
+      setState((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          name: nextSession.name,
+          firstName: nextSession.name.split(' ')[0],
+          initials: nextSession.initials || prev.profile.initials,
+          email: nextSession.email || prev.profile.email,
+        },
+      }))
+    }
   }, [])
 
   const signOut = useCallback(async () => {
@@ -567,15 +590,44 @@ export function AppProvider({ children }) {
   const setMonthlyIncome = useCallback(
     (amount) => {
       const value = Math.max(0, Math.round(Number(amount) || 0))
-      setState((prev) => ({
-        ...prev,
-        profile: { ...prev.profile, monthlyIncome: value },
-        transactions: prev.transactions.map((txn) =>
-          txn.amount > 0 && /salary|payroll|income/i.test(txn.description)
-            ? { ...txn, amount: value }
-            : txn,
-        ),
-      }))
+      setState((prev) => {
+        const hasSalary = prev.transactions.some(
+          (t) => t.amount > 0 && /salary|payroll|income/i.test(t.description),
+        )
+
+        let nextTxns
+        if (hasSalary) {
+          nextTxns = prev.transactions.map((txn) =>
+            txn.amount > 0 && /salary|payroll|income/i.test(txn.description)
+              ? { ...txn, amount: value }
+              : txn,
+          )
+        } else if (value > 0) {
+          const now = new Date()
+          const salaryTxn = {
+            id: `income-salary-${Date.now()}`,
+            description: 'Monthly Salary Credit',
+            category: 'Salary',
+            amount: value,
+            date: now.toISOString().slice(0, 10),
+            time: '09:00',
+            method: 'Bank Transfer',
+            merchant: 'Employer Payroll',
+          }
+          nextTxns = [salaryTxn, ...prev.transactions]
+          if (session?.isFirebaseUser && session?.uid) {
+            addTransactionFirestore(session.uid, salaryTxn).catch(console.error)
+          }
+        } else {
+          nextTxns = prev.transactions
+        }
+
+        return {
+          ...prev,
+          profile: { ...prev.profile, monthlyIncome: value },
+          transactions: nextTxns,
+        }
+      })
       if (session?.isFirebaseUser && session?.uid) {
         updateProfileFirestore(session.uid, { monthlyIncome: value }).catch(console.error)
       }
@@ -736,7 +788,10 @@ export function AppProvider({ children }) {
     const totalExpenses = Math.abs(
       expenses.reduce((sum, t) => sum + t.amount, 0),
     )
-    const totalIncome = incomeTxns.reduce((sum, t) => sum + t.amount, 0)
+    const totalIncome = Math.max(
+      Number(profile.monthlyIncome) || 0,
+      incomeTxns.reduce((sum, t) => sum + t.amount, 0),
+    )
     const netSavings = totalIncome - totalExpenses
     const savingsRate = ratioPercent(netSavings, totalIncome)
 

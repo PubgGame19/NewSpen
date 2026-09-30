@@ -48,7 +48,7 @@ function NavItem({ item, collapsed, onNavigate }) {
 }
 
 function SidebarBody({ collapsed, onNavigate, onClose, mobile }) {
-  const { profile, score, toggleSidebar } = useApp()
+  const { profile, score, toggleSidebar, session } = useApp()
 
   return (
     <div className="flex h-full flex-col">
@@ -121,15 +121,21 @@ function SidebarBody({ collapsed, onNavigate, onClose, mobile }) {
           }`}
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-[12px] font-bold text-white">
-            {profile.initials}
+            {profile.name && profile.name !== 'User'
+              ? profile.initials
+              : session?.initials || profile.initials || 'U'}
           </span>
           {!collapsed ? (
             <>
               <div className="min-w-0 flex-1">
                 <p className="heading truncate text-[13px] font-semibold">
-                  {profile.name}
+                  {profile.name && profile.name !== 'User'
+                    ? profile.name
+                    : session?.name || 'Personal Account'}
                 </p>
-                <p className="muted truncate text-[11px]">{profile.accountType}</p>
+                <p className="muted truncate text-[11px]">
+                  {session?.isFirebaseUser ? 'Firebase Cloud Account' : profile.accountType}
+                </p>
               </div>
               <span className="tabular muted text-[11px] font-semibold">
                 {formatINR(profile.monthlyIncome)}

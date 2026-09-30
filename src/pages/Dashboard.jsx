@@ -116,30 +116,31 @@ export default function Dashboard() {
   const [draftIncome, setDraftIncome] = useState('')
 
   const openBalanceModal = () => {
-    setDraftBalance(String(profile.openingBalance || ''))
+    setDraftBalance(balance ? String(balance) : (profile.openingBalance ? String(profile.openingBalance) : ''))
     setEditBalanceOpen(true)
   }
 
   const openIncomeModal = () => {
-    setDraftIncome(String(profile.monthlyIncome || ''))
+    setDraftIncome(totalIncome ? String(totalIncome) : (profile.monthlyIncome ? String(profile.monthlyIncome) : ''))
     setEditIncomeOpen(true)
   }
 
   const handleSaveBalance = (e) => {
     e?.preventDefault()
-    const val = Math.max(0, Number(draftBalance) || 0)
-    setOpeningBalance(val)
+    const targetBalance = Math.max(0, Math.round(Number(String(draftBalance).replace(/,/g, '')) || 0))
+    const netTransactions = transactions.reduce((sum, t) => sum + t.amount, 0)
+    setOpeningBalance(targetBalance - netTransactions)
     setEditBalanceOpen(false)
     pushToast({
-      title: 'Bank Balance Updated',
-      body: `Starting balance set to ${formatINR(val)}.`,
+      title: 'Total Balance Updated',
+      body: `Live balance set to ${formatINR(targetBalance)}.`,
       tone: 'emerald',
     })
   }
 
   const handleSaveIncome = (e) => {
     e?.preventDefault()
-    const val = Math.max(0, Number(draftIncome) || 0)
+    const val = Math.max(0, Math.round(Number(String(draftIncome).replace(/,/g, '')) || 0))
     setMonthlyIncome(val)
     setEditIncomeOpen(false)
     pushToast({
@@ -750,14 +751,13 @@ export default function Dashboard() {
               </span>
               <input
                 id="input-starting-balance"
-                type="number"
-                min="0"
-                step="any"
+                type="text"
+                inputMode="numeric"
                 required
                 autoFocus
                 placeholder="e.g. 50000"
                 value={draftBalance}
-                onChange={(e) => setDraftBalance(e.target.value)}
+                onChange={(e) => setDraftBalance(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="input tabular pl-8 text-base font-bold"
               />
             </div>
@@ -797,14 +797,13 @@ export default function Dashboard() {
               </span>
               <input
                 id="input-monthly-income"
-                type="number"
-                min="0"
-                step="any"
+                type="text"
+                inputMode="numeric"
                 required
                 autoFocus
                 placeholder="e.g. 75000"
                 value={draftIncome}
-                onChange={(e) => setDraftIncome(e.target.value)}
+                onChange={(e) => setDraftIncome(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="input tabular pl-8 text-base font-bold"
               />
             </div>
