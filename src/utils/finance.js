@@ -91,17 +91,15 @@ export function financialScore({
   budgetUsage = 0,
   debtToIncome = 0,
   monthlyExpenses = 0,
-  emergencyFund = 0,
   hasTransactions = false,
 }) {
-  if (!hasTransactions && monthlyExpenses === 0 && savingsRate === 0 && emergencyFund === 0) {
+  if (!hasTransactions && monthlyExpenses === 0 && savingsRate === 0) {
     return {
       total: 0,
       pillars: [
         { key: 'savings', label: 'Savings discipline', value: 0 },
         { key: 'budget', label: 'Budget control', value: 0 },
         { key: 'debt', label: 'Debt management', value: 0 },
-        { key: 'emergency', label: 'Emergency buffer', value: 0 },
       ],
     }
   }
@@ -109,9 +107,7 @@ export function financialScore({
   const savings = clamp((savingsRate / 40) * 100)
   const budget = clamp(164 - budgetUsage)
   const debt = clamp(100 - debtToIncome)
-  const target = Math.max(1, monthlyExpenses * 3)
-  const emergency = clamp((emergencyFund / target) * 100)
-  const total = Math.round((savings + budget + debt + emergency) / 4)
+  const total = Math.round((savings + budget + debt) / 3)
 
   return {
     total: clamp(total),
@@ -119,7 +115,6 @@ export function financialScore({
       { key: 'savings', label: 'Savings discipline', value: Math.round(savings) },
       { key: 'budget', label: 'Budget control', value: Math.round(budget) },
       { key: 'debt', label: 'Debt management', value: Math.round(debt) },
-      { key: 'emergency', label: 'Emergency buffer', value: Math.round(emergency) },
     ],
   }
 }

@@ -834,7 +834,6 @@ export function AppProvider({ children }) {
       budgetUsage: budgetUsagePercent,
       debtToIncome: profile.debtToIncome,
       monthlyExpenses: totalExpenses,
-      emergencyFund: profile.emergencyFund,
       hasTransactions: transactions.length > 0 || totalIncome > 0,
     })
 

@@ -294,11 +294,11 @@ export const AI_KNOWLEDGE = [
     id: 'health',
     keywords: ['financial health', 'health', 'score', 'how am i doing', 'rating'],
     response:
-      'Your Financial Health Score is computed continuously across 4 key pillars: Savings Discipline, Budget Control, Debt Management, and your Emergency Buffer.',
+      'Your Financial Health Score is computed continuously across 3 key pillars: Savings Discipline, Budget Control, and Debt Management.',
     highlights: [
-      '4 Pillars of financial fitness',
+      '3 Pillars of financial fitness',
       'Aim for a score above 75 (Good)',
-      'Keep 3-6 months liquid emergency fund',
+      'Disciplined savings and low debt',
     ],
   },
   {
